@@ -8,8 +8,19 @@ import {
   exchangeCodeForProfile,
 } from "../lib/google";
 import { encrypt } from "../lib/crypto";
+import { sql } from "drizzle-orm";
+import { signAuthToken, resolveAuth } from "../lib/token";
 
 const router: IRouter = Router();
+
+// When the frontend is hosted on a different origin (e.g. GitHub Pages) set
+// WEB_APP_URL to its full URL. After login we redirect there with a bearer
+// token in the URL fragment; otherwise we redirect to the same-origin root.
+function frontendUrl(suffix: string): string {
+  const base = process.env["WEB_APP_URL"];
+  if (!base) return suffix.startsWith("#") ? `/${suffix}` : suffix;
+  return `${base.replace(/\/+$/, "")}/${suffix}`;
+}
 
 router.get("/auth/google", (req, res, next) => {
   if (!isGoogleConfigured()) {
@@ -38,11 +49,11 @@ router.get("/auth/google/callback", async (req, res, next) => {
     delete req.session.oauthState;
 
     if (oauthError || !code) {
-      res.redirect("/?auth=error");
+      res.redirect(frontendUrl("?auth=error"));
       return;
     }
     if (!expectedState || returnedState !== expectedState) {
-      res.redirect("/?auth=error");
+      res.redirect(frontendUrl("?auth=error"));
       return;
     }
 
@@ -65,6 +76,7 @@ router.get("/auth/google/callback", async (req, res, next) => {
       .where(eq(usersTable.googleId, profile.googleId));
 
     let userId: number;
+    let tokenVersion: number;
     if (existing) {
       // Preserve an existing refresh token if Google didn't return a new one.
       const update = { ...values };
@@ -76,18 +88,32 @@ router.get("/auth/google/callback", async (req, res, next) => {
         .set(update)
         .where(eq(usersTable.id, existing.id));
       userId = existing.id;
+      tokenVersion = existing.tokenVersion;
     } else {
       const [created] = await db
         .insert(usersTable)
         .values(values)
-        .returning({ id: usersTable.id });
+        .returning({
+          id: usersTable.id,
+          tokenVersion: usersTable.tokenVersion,
+        });
       userId = created.id;
+      tokenVersion = created.tokenVersion;
     }
 
     req.session.userId = userId;
     req.session.save((err) => {
       if (err) return next(err);
-      res.redirect("/");
+      // Same-origin (Replit): the session cookie is enough, go to the app root.
+      // Cross-origin (WEB_APP_URL set): the frontend cannot read our cookie, so
+      // hand it a signed bearer token via the URL fragment (never sent to a
+      // server, kept out of access logs) for it to store and send back.
+      if (process.env["WEB_APP_URL"]) {
+        const token = signAuthToken(userId, tokenVersion);
+        res.redirect(frontendUrl(`#token=${encodeURIComponent(token)}`));
+      } else {
+        res.redirect("/");
+      }
     });
   } catch (err) {
     next(err);
@@ -96,16 +122,20 @@ router.get("/auth/google/callback", async (req, res, next) => {
 
 router.get("/auth/me", async (req, res, next) => {
   try {
-    const userId = req.session.userId;
-    if (!userId) {
+    const auth = resolveAuth(req);
+    if (!auth) {
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
     const [user] = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.id, userId));
+      .where(eq(usersTable.id, auth.userId));
     if (!user) {
+      res.status(401).json({ error: "Not authenticated" });
+      return;
+    }
+    if (auth.tokenVersion !== null && auth.tokenVersion !== user.tokenVersion) {
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
@@ -120,7 +150,20 @@ router.get("/auth/me", async (req, res, next) => {
   }
 });
 
-router.post("/auth/logout", (req, res) => {
+router.post("/auth/logout", async (req, res, next) => {
+  try {
+    // Revoke every previously-issued bearer token for this user by bumping
+    // their token version. Resolve the id before the session is destroyed.
+    const auth = resolveAuth(req);
+    if (auth) {
+      await db
+        .update(usersTable)
+        .set({ tokenVersion: sql`${usersTable.tokenVersion} + 1` })
+        .where(eq(usersTable.id, auth.userId));
+    }
+  } catch (err) {
+    return next(err);
+  }
   req.session.destroy(() => {
     res.clearCookie("connect.sid");
     res.status(204).end();

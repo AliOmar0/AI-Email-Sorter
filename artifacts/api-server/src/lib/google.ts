@@ -21,11 +21,20 @@ export function isGoogleConfigured(): boolean {
 }
 
 function getBaseUrl(): string {
+  // Explicit override takes precedence (set this on non-Replit hosts such as
+  // Vercel so the OAuth redirect URI matches the deployed API domain).
+  const explicit = process.env["API_PUBLIC_URL"];
+  if (explicit) return explicit.replace(/\/+$/, "");
+
   const domain =
     process.env["REPLIT_DEV_DOMAIN"] ||
-    process.env["REPLIT_DOMAINS"]?.split(",")[0];
+    process.env["REPLIT_DOMAINS"]?.split(",")[0] ||
+    // Vercel injects VERCEL_URL (host only, no scheme) for the deployment.
+    process.env["VERCEL_URL"];
   if (!domain) {
-    throw new Error("No REPLIT_DEV_DOMAIN/REPLIT_DOMAINS available for OAuth redirect");
+    throw new Error(
+      "No API_PUBLIC_URL/REPLIT_DEV_DOMAIN/REPLIT_DOMAINS/VERCEL_URL available for OAuth redirect",
+    );
   }
   return `https://${domain}`;
 }

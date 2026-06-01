@@ -34,7 +34,21 @@ app.use(
     },
   }),
 );
-app.use(cors());
+// Cross-origin deployments (static frontend on a different domain than this API)
+// must allow that origin explicitly with credentials. On Replit the app is
+// same-origin, so the permissive default is used. Set WEB_APP_URL to the
+// deployed frontend URL to enable the restricted, credentialed policy.
+const webAppUrl = process.env["WEB_APP_URL"];
+if (webAppUrl) {
+  app.use(
+    cors({
+      origin: new URL(webAppUrl).origin,
+      credentials: true,
+    }),
+  );
+} else {
+  app.use(cors());
+}
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

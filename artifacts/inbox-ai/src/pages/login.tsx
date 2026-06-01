@@ -1,9 +1,12 @@
 import { Sparkles, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { apiUrl } from "@/lib/api-base";
 
 export default function LoginPage() {
   const handleLogin = () => {
-    window.location.href = "/api/auth/google";
+    // apiUrl prefixes the remote backend origin in cross-origin deploys; on
+    // Replit it resolves to the same-origin "/api/auth/google".
+    window.location.href = apiUrl("/api/auth/google");
   };
 
   return (

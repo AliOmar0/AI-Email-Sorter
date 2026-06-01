@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useListLabels, getListLabelsQueryKey, User, useLogout } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { clearAuthToken } from "@/lib/api-base";
 
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -37,6 +38,8 @@ export function Sidebar({ user }: { user: User }) {
   const handleLogout = () => {
     logout.mutate(undefined, {
       onSuccess: () => {
+        // Drop the cross-origin bearer token (no-op on Replit/cookie auth).
+        clearAuthToken();
         queryClient.clear();
         setLocation("/");
       }
