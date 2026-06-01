@@ -1,55 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 
-interface EmailBodyProps {
-  html: string;
-  text: string;
-}
-
 const FRAME_STYLES = `
   <style>
     :root { color-scheme: light dark; }
     html, body {
-      margin: 0;
-      padding: 0;
-      background: transparent;
-      color: inherit;
+      margin: 0; padding: 0; background: transparent; color: inherit;
       font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: 14px;
-      line-height: 1.6;
-      word-break: break-word;
-      overflow-wrap: anywhere;
+      font-size: 14px; line-height: 1.6; word-break: break-word; overflow-wrap: anywhere;
     }
-    @media (prefers-color-scheme: dark) {
-      body { color: #f3f4f6; }
-      a { color: #818cf8; }
-    }
-    @media (prefers-color-scheme: light) {
-      body { color: #1f2937; }
-      a { color: #4f46e5; }
-    }
+    @media (prefers-color-scheme: light) { body { color: #1f2937; } a { color: #4f46e5; } }
     img { max-width: 100% !important; height: auto !important; border-radius: 8px; }
     table { max-width: 100% !important; }
     * { max-width: 100%; box-sizing: border-box; }
-    
-    /* Clean up default blockquotes often found in emails */
-    blockquote {
-      border-left: 3px solid #cbd5e1;
-      margin-left: 0;
-      padding-left: 1rem;
-      color: #64748b;
-    }
-    @media (prefers-color-scheme: dark) {
-      blockquote { border-left-color: #475569; color: #94a3b8; }
-    }
   </style>
 `;
 
-/**
- * Renders an email body inside a sandboxed iframe so the sender's HTML and
- * styles are fully isolated from the app's own UI. The frame auto-sizes to its
- * content. Falls back to plain text when no HTML body is available.
- */
-export function EmailBody({ html, text }: EmailBodyProps) {
+function EmailBody({ html, text }: { html: string; text: string }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(200);
 
@@ -61,11 +27,8 @@ export function EmailBody({ html, text }: EmailBodyProps) {
     if (!srcDoc) return;
     const frame = frameRef.current;
     if (!frame) return;
-
     let observer: ResizeObserver | null = null;
 
-    // Measure the iframe's content height. This requires `allow-same-origin`
-    // on the sandbox (scripts stay disabled), otherwise contentDocument is null.
     const measure = () => {
       const doc = frame.contentDocument;
       if (!doc || !doc.body) return;
@@ -73,22 +36,18 @@ export function EmailBody({ html, text }: EmailBodyProps) {
         8000,
         Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight),
       );
-      if (next > 0) setHeight(next + 24); // breathing room
+      if (next > 0) setHeight(next + 24);
     };
 
     const onLoad = () => {
       measure();
       const doc = frame.contentDocument;
       if (!doc || !doc.body) return;
-
-      // Keep resizing as fonts/images/layout settle, permanently (not just 3s).
       if (typeof ResizeObserver !== "undefined") {
         observer = new ResizeObserver(() => measure());
         observer.observe(doc.body);
         observer.observe(doc.documentElement);
       }
-
-      // Images often load after the document, changing total height.
       doc.querySelectorAll("img").forEach((img) => {
         if (!img.complete) {
           img.addEventListener("load", measure, { once: true });
@@ -98,9 +57,7 @@ export function EmailBody({ html, text }: EmailBodyProps) {
     };
 
     frame.addEventListener("load", onLoad);
-    // srcDoc can be ready synchronously; attempt an immediate measure too.
     measure();
-
     return () => {
       frame.removeEventListener("load", onLoad);
       observer?.disconnect();
@@ -126,6 +83,37 @@ export function EmailBody({ html, text }: EmailBodyProps) {
         style={{ height }}
         className="w-full border-0 bg-transparent block"
       />
+    </div>
+  );
+}
+
+const paragraph =
+  "Thank you for your continued partnership this quarter. We wanted to share a detailed summary of everything that shipped, what we learned, and where we are headed next. This message intentionally runs long so we can confirm the reading pane expands to fit the full content without any blank gap.";
+
+const LONG_HTML = `
+  <h1 style="font-size:22px;margin:0 0 12px">Quarterly Product Update</h1>
+  <p>${paragraph}</p>
+  <h2 style="font-size:18px;margin:20px 0 8px">What shipped</h2>
+  <ul>
+    ${Array.from({ length: 10 }, (_, i) => `<li>Feature item number ${i + 1}: ${paragraph}</li>`).join("")}
+  </ul>
+  <h2 style="font-size:18px;margin:20px 0 8px">Details</h2>
+  ${Array.from({ length: 8 }, () => `<p>${paragraph}</p>`).join("")}
+  <blockquote>${paragraph}</blockquote>
+  <p style="margin-top:24px">Best regards,<br/>The Product Team</p>
+`;
+
+export function TallEmail() {
+  return (
+    <div className="min-h-screen bg-background p-8">
+      <div className="mx-auto max-w-[640px] rounded-xl border border-border bg-card p-6 shadow-sm">
+        <div className="mb-4 border-b border-border pb-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Reading pane — auto-height check
+          </p>
+        </div>
+        <EmailBody html={LONG_HTML} text="" />
+      </div>
     </div>
   );
 }
