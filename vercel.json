@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "buildCommand": "pnpm --filter @workspace/api-server run build:vercel",
-  "outputDirectory": "api",
+  "outputDirectory": "public",
   "functions": {
     "api/index.mjs": {
       "maxDuration": 30
