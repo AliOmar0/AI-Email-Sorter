@@ -56,7 +56,10 @@ export interface Email {
   senderEmail: string;
   subject: string;
   snippet: string;
+  /** Plain-text rendering of the email body (HTML stripped). Used for previews and AI context. */
   body: string;
+  /** Sanitized HTML body for rich display. Empty string when the email has no HTML part. */
+  bodyHtml: string;
   receivedAt: string;
   isRead: boolean;
   isStarred: boolean;

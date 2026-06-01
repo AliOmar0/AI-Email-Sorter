@@ -86,115 +86,116 @@ export default function AIStudioPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-muted/30">
-      <div className="max-w-5xl mx-auto p-8 space-y-8">
-        <div className="flex items-center justify-between border-b border-border/50 pb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-              <Sparkles className="w-8 h-8 text-primary" />
+    <div className="flex-1 overflow-y-auto bg-background">
+      <div className="max-w-5xl mx-auto p-8 lg:p-12 space-y-12">
+        <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 border-b border-border/50 pb-8">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground flex items-center gap-3">
+              <Sparkles className="w-8 h-8 text-foreground" />
               AI Studio
             </h1>
-            <p className="text-muted-foreground mt-1">
-              Let the AI analyze your inbox and automatically organize your emails.
+            <p className="text-muted-foreground text-base max-w-lg">
+              Let the AI analyze your inbox, recognize patterns, and automatically organize your emails.
             </p>
           </div>
           {stats && (
-            <div className="bg-background rounded-lg border border-border p-3 flex flex-col items-end shadow-sm">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Unlabeled Emails</span>
-              <span className="text-2xl font-bold text-amber-500">{stats.unlabeledCount}</span>
+            <div className="bg-muted/40 rounded-2xl border border-border/50 px-6 py-4 flex flex-col items-end shadow-sm">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Unlabeled Emails</span>
+              <span className="text-3xl font-bold tracking-tight text-foreground">{stats.unlabeledCount}</span>
             </div>
           )}
         </div>
 
         {activeTab === "overview" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Auto-Label Card */}
-            <Card className="border-primary/20 shadow-md relative overflow-hidden flex flex-col">
-              <div className="absolute top-0 right-0 p-4 opacity-10">
-                <Wand2 className="w-32 h-32 text-primary" />
+            <Card className="border-border/60 shadow-sm rounded-3xl relative overflow-hidden flex flex-col">
+              <div className="absolute top-0 right-0 p-8 opacity-[0.02] pointer-events-none">
+                <Wand2 className="w-48 h-48" />
               </div>
-              <CardHeader className="relative z-10">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4">
-                  <BrainCircuit className="w-6 h-6 text-primary" />
+              <CardHeader className="relative z-10 p-8 pb-4">
+                <div className="w-12 h-12 bg-foreground rounded-xl flex items-center justify-center mb-6 shadow-sm">
+                  <BrainCircuit className="w-6 h-6 text-background" />
                 </div>
-                <CardTitle>Magic Auto-Label</CardTitle>
-                <CardDescription>
-                  The AI will read all your unlabeled emails and automatically apply the best existing labels to them. Fast and effortless.
+                <CardTitle className="text-2xl">Magic Auto-Label</CardTitle>
+                <CardDescription className="text-base mt-2">
+                  The AI reads all your unlabeled emails and automatically applies the best existing labels. Fast and effortless.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 relative z-10">
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-500" /> Matches against your existing labels</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-500" /> Analyzes full email context</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-500" /> Skips uncertain emails automatically</li>
+              <CardContent className="flex-1 relative z-10 px-8">
+                <ul className="space-y-3 text-sm text-muted-foreground/80 font-medium">
+                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-foreground/50" /> Matches against your existing labels</li>
+                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-foreground/50" /> Analyzes full email context</li>
+                  <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-foreground/50" /> Skips uncertain emails automatically</li>
                 </ul>
               </CardContent>
-              <CardFooter className="relative z-10 bg-muted/50 border-t border-border mt-auto pt-6">
+              <CardFooter className="relative z-10 p-8 pt-6">
                 <Button 
-                  className="w-full gap-2 shadow-sm" 
-                  size="lg" 
+                  className="w-full h-12 rounded-xl text-base font-medium shadow-sm" 
                   onClick={handleRunAutoLabel}
                   disabled={autoLabel.isPending || (stats?.unlabeledCount === 0)}
                 >
                   {autoLabel.isPending ? (
-                    <><Loader2 className="w-5 h-5 animate-spin" /> Analyzing Inbox...</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Analyzing Inbox...</>
                   ) : (
-                    <><Wand2 className="w-5 h-5" /> Run Auto-Label Now</>
+                    <><Wand2 className="w-4 h-4 mr-2" /> Run Auto-Label Now</>
                   )}
                 </Button>
               </CardFooter>
             </Card>
 
             {/* Smart Groups Card */}
-            <Card className="border-border shadow-sm flex flex-col">
-              <CardHeader>
-                <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center mb-4">
-                  <Layers className="w-6 h-6 text-indigo-500" />
+            <Card className="border-border/60 shadow-sm rounded-3xl flex flex-col">
+              <CardHeader className="p-8 pb-4">
+                <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center mb-6 border border-border/50">
+                  <Layers className="w-6 h-6 text-muted-foreground" />
                 </div>
-                <CardTitle>Discover Smart Groups</CardTitle>
-                <CardDescription>
-                  The AI will find patterns in your unlabeled emails and suggest new labels to group them together.
+                <CardTitle className="text-2xl">Discover Smart Groups</CardTitle>
+                <CardDescription className="text-base mt-2">
+                  The AI finds patterns in your unlabeled emails and suggests new labels to group them.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex-1">
-                <p className="text-sm text-muted-foreground mb-6">
-                  Perfect for when your inbox has grown out of control and you need fresh ideas on how to categorize it.
-                </p>
+              <CardContent className="flex-1 px-8 pb-0">
+                {!suggestGroups.isPending && !suggestGroups.isSuccess && (
+                  <p className="text-sm text-muted-foreground">
+                    Perfect for when your inbox has grown out of control and you need fresh ideas on how to categorize it.
+                  </p>
+                )}
                 
                 {suggestGroups.isPending && (
-                  <div className="space-y-4 py-4">
+                  <div className="space-y-4 py-4 animate-in fade-in">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-primary font-medium flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Discovering patterns...</span>
+                      <span className="font-medium flex items-center gap-2 text-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Discovering patterns...</span>
                     </div>
-                    <Progress value={45} className="h-2" />
+                    <Progress value={undefined} className="h-1.5" />
                   </div>
                 )}
 
                 {suggestGroups.isSuccess && suggestGroups.data && (
-                  <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+                  <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 pb-8 scrollbar-thin">
                     {suggestGroups.data.length === 0 ? (
-                      <div className="text-center p-4 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+                      <div className="text-center p-8 bg-muted/30 rounded-2xl text-sm text-muted-foreground border border-border/50">
                         No clear patterns found in your unlabeled emails.
                       </div>
                     ) : (
                       suggestGroups.data.map((group, i) => (
-                        <div key={i} className="bg-background border border-border p-4 rounded-xl shadow-sm">
-                          <div className="flex items-start justify-between mb-2">
-                            <div>
+                        <div key={i} className="bg-background border border-border/60 p-5 rounded-2xl shadow-sm hover:border-border transition-colors">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="space-y-2">
                               <LabelBadge label={{ name: group.suggestedLabel, color: group.suggestedColor || "#6366f1" }} size="md" />
-                              <p className="text-xs text-muted-foreground mt-2">{group.reason}</p>
+                              <p className="text-xs text-muted-foreground leading-relaxed pr-4">{group.reason}</p>
                             </div>
-                            <span className="text-xs font-bold bg-muted px-2 py-1 rounded-md">
+                            <span className="text-[10px] uppercase tracking-wider font-bold bg-muted px-2 py-1 rounded-md shrink-0 text-muted-foreground">
                               {group.emailIds.length} emails
                             </span>
                           </div>
                           <Button 
-                            variant="secondary" 
+                            variant="outline" 
                             size="sm" 
-                            className="w-full mt-3 gap-2"
+                            className="w-full h-9 rounded-lg gap-2 text-xs font-medium border-border/60 shadow-none hover:bg-muted/50"
                             onClick={() => handleApplyGroup(group)}
                           >
-                            Create Label & Apply <ArrowRight className="w-4 h-4" />
+                            Create Label & Apply <ArrowRight className="w-3.5 h-3.5" />
                           </Button>
                         </div>
                       ))
@@ -203,15 +204,14 @@ export default function AIStudioPage() {
                 )}
               </CardContent>
               {!suggestGroups.isSuccess && (
-                <CardFooter className="bg-muted/50 border-t border-border mt-auto pt-6">
+                <CardFooter className="p-8 pt-6 mt-auto">
                   <Button 
                     variant="outline"
-                    className="w-full gap-2" 
-                    size="lg"
+                    className="w-full h-12 rounded-xl text-base font-medium shadow-sm border-border/60" 
                     onClick={handleSuggestGroups}
                     disabled={suggestGroups.isPending || (stats?.unlabeledCount === 0)}
                   >
-                    <Layers className="w-5 h-5" /> Find Patterns
+                    <Layers className="w-4 h-4 mr-2" /> Find Patterns
                   </Button>
                 </CardFooter>
               )}
@@ -220,29 +220,29 @@ export default function AIStudioPage() {
         )}
 
         {activeTab === "results" && autoLabelResult && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-            <Button variant="ghost" onClick={() => setActiveTab("overview")} className="gap-2 mb-4 -ml-4">
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 max-w-2xl mx-auto">
+            <Button variant="ghost" onClick={() => setActiveTab("overview")} className="gap-2 mb-4 -ml-4 rounded-xl text-muted-foreground hover:text-foreground">
               <ArrowRight className="w-4 h-4 rotate-180" /> Back to Studio
             </Button>
             
-            <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-8 text-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent pointer-events-none" />
-              <div className="w-20 h-20 bg-background rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl border border-primary/20">
-                <CheckCircle2 className="w-10 h-10 text-primary" />
+            <div className="bg-card border border-border/60 rounded-[2rem] p-12 text-center relative overflow-hidden shadow-sm">
+              <div className="absolute inset-0 bg-gradient-to-b from-muted/30 to-transparent pointer-events-none" />
+              <div className="w-24 h-24 bg-foreground rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-sm relative z-10">
+                <CheckCircle2 className="w-10 h-10 text-background" />
               </div>
-              <h2 className="text-3xl font-bold mb-2">Auto-Label Complete</h2>
-              <p className="text-lg text-muted-foreground max-w-lg mx-auto">
-                The AI analyzed <span className="font-bold text-foreground">{autoLabelResult.processed}</span> emails and successfully categorized <span className="font-bold text-foreground">{autoLabelResult.labeled}</span> of them.
+              <h2 className="text-4xl font-bold mb-3 tracking-tight relative z-10">Auto-Label Complete</h2>
+              <p className="text-lg text-muted-foreground max-w-md mx-auto relative z-10">
+                Analyzed <span className="font-medium text-foreground">{autoLabelResult.processed}</span> emails and successfully categorized <span className="font-medium text-foreground">{autoLabelResult.labeled}</span>.
               </p>
               
-              <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto mt-8">
-                <div className="bg-background rounded-xl p-4 shadow-sm border border-border">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Processed</p>
-                  <p className="text-3xl font-bold">{autoLabelResult.processed}</p>
+              <div className="grid grid-cols-2 gap-6 max-w-sm mx-auto mt-10 relative z-10">
+                <div className="bg-muted/40 rounded-2xl p-5 border border-border/50">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Processed</p>
+                  <p className="text-4xl font-bold tracking-tight">{autoLabelResult.processed}</p>
                 </div>
-                <div className="bg-background rounded-xl p-4 shadow-sm border border-primary/20">
-                  <p className="text-sm font-medium text-primary mb-1">Labeled</p>
-                  <p className="text-3xl font-bold text-primary">{autoLabelResult.labeled}</p>
+                <div className="bg-background rounded-2xl p-5 border border-border/80 shadow-sm">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-foreground mb-1">Labeled</p>
+                  <p className="text-4xl font-bold tracking-tight text-foreground">{autoLabelResult.labeled}</p>
                 </div>
               </div>
             </div>

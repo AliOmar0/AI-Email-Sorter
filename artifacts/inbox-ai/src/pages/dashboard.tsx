@@ -10,40 +10,42 @@ export default function Dashboard() {
 
   if (isLoading || !stats) {
     return (
-      <div className="p-8 space-y-6">
-        <Skeleton className="h-10 w-48 mb-8" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="p-8 space-y-8 animate-in fade-in duration-500">
+        <Skeleton className="h-10 w-64 mb-8 rounded-lg" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-32 rounded-xl" />
+            <Skeleton key={i} className="h-32 rounded-2xl" />
           ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-          <Skeleton className="h-96 rounded-xl" />
-          <Skeleton className="h-96 rounded-xl" />
+          <Skeleton className="h-96 rounded-2xl" />
+          <Skeleton className="h-96 rounded-2xl" />
         </div>
       </div>
     );
   }
 
+  const organizedPercent = Math.round((stats.labeledCount / Math.max(stats.totalEmails, 1)) * 100);
+
   const statCards = [
-    { title: "Total Emails", value: stats.totalEmails, icon: Mail, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { title: "Unlabeled", value: stats.unlabeledCount, icon: InboxIcon, color: "text-amber-500", bg: "bg-amber-500/10" },
-    { title: "Unread", value: stats.unreadCount, icon: EyeOff, color: "text-indigo-500", bg: "bg-indigo-500/10" },
-    { title: "Starred", value: stats.starredCount, icon: Star, color: "text-yellow-500", bg: "bg-yellow-500/10" },
+    { title: "Total Emails", value: stats.totalEmails, icon: Mail },
+    { title: "Unlabeled", value: stats.unlabeledCount, icon: InboxIcon },
+    { title: "Unread", value: stats.unreadCount, icon: EyeOff },
+    { title: "Starred", value: stats.starredCount, icon: Star },
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto bg-muted/30">
-      <div className="max-w-6xl mx-auto p-8 space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Your inbox is {Math.round((stats.labeledCount / Math.max(stats.totalEmails, 1)) * 100)}% organized.
+    <div className="flex-1 overflow-y-auto bg-background selection:bg-primary/10">
+      <div className="max-w-6xl mx-auto p-8 lg:p-12 space-y-12">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground">Overview</h1>
+            <p className="text-muted-foreground text-base">
+              Your inbox is <span className="font-medium text-foreground">{organizedPercent}%</span> organized.
             </p>
           </div>
           <Link href="/ai">
-            <Button className="gap-2 shadow-md">
+            <Button className="gap-2 rounded-xl px-6" size="lg">
               <Sparkles className="w-4 h-4" />
               Open AI Studio
             </Button>
@@ -52,72 +54,77 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {statCards.map((stat, i) => (
-            <Card key={i} className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-6 flex items-center gap-4">
-                <div className={`p-3 rounded-xl ${stat.bg} ${stat.color}`}>
-                  <stat.icon className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
-                  <p className="text-3xl font-bold">{stat.value}</p>
+            <Card key={i} className="border-border/60 shadow-sm rounded-2xl overflow-hidden hover:border-border transition-colors">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-muted text-muted-foreground">
+                    <stat.icon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">{stat.title}</p>
+                    <p className="text-3xl font-semibold tracking-tight text-foreground">{stat.value}</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="border-border/50 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Tags className="w-5 h-5 text-primary" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Card className="border-border/60 shadow-sm rounded-2xl flex flex-col">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Tags className="w-4 h-4 text-muted-foreground" />
                 Top Labels
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
+            <CardContent className="flex-1">
+              <div className="space-y-1">
                 {stats.labelBreakdown.slice(0, 8).map((l) => (
                   <Link key={l.id} href={`/inbox?labelId=${l.id}`}>
-                    <div className="flex items-center justify-between group cursor-pointer p-2 -mx-2 rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between group cursor-pointer p-3 -mx-3 rounded-xl hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: l.color || '#888' }} />
-                        <span className="font-medium text-sm group-hover:text-primary transition-colors">{l.name}</span>
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: l.color || '#888' }} />
+                        <span className="font-medium text-sm text-foreground/90 group-hover:text-foreground transition-colors">{l.name}</span>
                       </div>
-                      <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-md">{l.count}</span>
+                      <span className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">{l.count}</span>
                     </div>
                   </Link>
                 ))}
                 {stats.labelBreakdown.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    No labels created yet.
+                  <div className="flex flex-col items-center justify-center h-48 text-center text-muted-foreground space-y-3">
+                    <Tags className="w-8 h-8 opacity-20" />
+                    <p className="text-sm">No labels created yet.</p>
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-border/50 shadow-sm overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
-            <CardHeader className="relative z-10">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Sparkles className="w-5 h-5 text-primary" />
+          <Card className="border-border/60 shadow-sm rounded-2xl flex flex-col relative overflow-hidden bg-card">
+            <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
+              <Sparkles className="w-32 h-32" />
+            </div>
+            <CardHeader className="pb-4 relative z-10">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Sparkles className="w-4 h-4 text-muted-foreground" />
                 AI Assistant
               </CardTitle>
             </CardHeader>
-            <CardContent className="relative z-10">
-              <div className="space-y-4">
+            <CardContent className="flex-1 flex flex-col relative z-10">
+              <div className="space-y-6 flex-1 flex flex-col">
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   Let AI analyze your unlabeled emails and suggest ways to organize them. 
-                  It can automatically apply labels based on content, sender, and context.
+                  It automatically applies labels based on content, sender, and context.
                 </p>
-                <div className="bg-background rounded-lg border border-border p-4 shadow-sm flex items-center justify-between">
+                <div className="mt-auto bg-muted/30 rounded-xl border border-border/50 p-5 flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-sm">Unlabeled Emails</p>
-                    <p className="text-2xl font-bold text-amber-500 mt-1">{stats.unlabeledCount}</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">Unlabeled Emails</p>
+                    <p className="text-3xl font-semibold text-foreground tracking-tight">{stats.unlabeledCount}</p>
                   </div>
                   <Link href="/ai">
-                    <Button variant="secondary" size="sm" className="gap-2">
-                      <Sparkles className="w-4 h-4" />
+                    <Button variant="outline" size="sm" className="gap-2 rounded-lg bg-background shadow-sm hover:bg-muted">
+                      <Sparkles className="w-3.5 h-3.5" />
                       Auto-Label
                     </Button>
                   </Link>

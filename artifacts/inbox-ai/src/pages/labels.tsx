@@ -22,7 +22,7 @@ export default function LabelsPage() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingLabel, setEditingLabel] = useState<Label | null>(null);
-  const [formData, setFormData] = useState({ name: "", color: "#6366f1", description: "" });
+  const [formData, setFormData] = useState({ name: "", color: "#3b82f6", description: "" });
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -33,7 +33,7 @@ export default function LabelsPage() {
 
   const handleOpenCreate = () => {
     setEditingLabel(null);
-    setFormData({ name: "", color: "#6366f1", description: "" });
+    setFormData({ name: "", color: "#3b82f6", description: "" });
     setIsDialogOpen(true);
   };
 
@@ -41,7 +41,7 @@ export default function LabelsPage() {
     setEditingLabel(label);
     setFormData({ 
       name: label.name, 
-      color: label.color || "#6366f1", 
+      color: label.color || "#3b82f6", 
       description: label.description || "" 
     });
     setIsDialogOpen(true);
@@ -90,44 +90,44 @@ export default function LabelsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-muted/30">
-      <div className="max-w-4xl mx-auto p-8 space-y-8">
+    <div className="flex-1 overflow-y-auto bg-background selection:bg-primary/10">
+      <div className="max-w-4xl mx-auto p-8 lg:p-12 space-y-10">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-              <Tags className="w-8 h-8 text-primary" />
+              <Tags className="w-7 h-7 text-muted-foreground" />
               Manage Labels
             </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Create, edit, and organize the tags used to categorize your inbox.
+            <p className="text-muted-foreground text-sm">
+              Organize and categorize your inbox with custom tags.
             </p>
           </div>
-          <Button onClick={handleOpenCreate} className="gap-2 shadow-sm">
+          <Button onClick={handleOpenCreate} className="gap-2 shadow-sm rounded-xl h-10 px-5">
             <Plus className="w-4 h-4" />
             Create Label
           </Button>
         </div>
 
-        <div className="bg-background rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-card rounded-3xl border border-border/60 shadow-sm overflow-hidden">
           {isLoading ? (
             <div className="p-6 space-y-4">
               {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                <Skeleton key={i} className="h-16 w-full rounded-xl" />
               ))}
             </div>
           ) : (
-            <div className="divide-y divide-border/50">
+            <div className="divide-y divide-border/40">
               {labels.map((label) => (
-                <div key={label.id} className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm" style={{ backgroundColor: `${label.color || '#888'}15`, color: label.color || '#888' }}>
-                      <Tags className="w-5 h-5" />
+                <div key={label.id} className="flex items-center justify-between p-5 hover:bg-muted/30 transition-colors group">
+                  <div className="flex items-center gap-5">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-muted/50 border border-border/50">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: label.color || '#888' }} />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-3 mb-1">
                         <LabelBadge label={label} size="md" />
                         {label.isSystem && (
-                          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted px-1.5 py-0.5 rounded-sm">
+                          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted px-2 py-0.5 rounded-[4px]">
                             <ShieldAlert className="w-3 h-3" />
                             System
                           </span>
@@ -139,17 +139,17 @@ export default function LabelsPage() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-4">
-                    <div className="text-center px-4">
-                      <p className="text-xl font-semibold">{label.emailCount}</p>
-                      <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Emails</p>
+                  <div className="flex items-center gap-6">
+                    <div className="text-right flex flex-col items-end">
+                      <p className="text-lg font-semibold tabular-nums text-foreground">{label.emailCount}</p>
+                      <p className="text-[10px] uppercase font-medium text-muted-foreground tracking-wider">Emails</p>
                     </div>
                     
-                    <div className="flex items-center gap-2 border-l border-border/50 pl-4">
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(label)} disabled={label.isSystem}>
-                        <Edit2 className="w-4 h-4 text-muted-foreground" />
+                    <div className="flex items-center gap-1 border-l border-border/50 pl-4 h-10">
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(label)} disabled={label.isSystem} className="rounded-full w-8 h-8 text-muted-foreground hover:text-foreground">
+                        <Edit2 className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(label.id)} disabled={label.isSystem} className="hover:text-destructive hover:bg-destructive/10">
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(label.id)} disabled={label.isSystem} className="rounded-full w-8 h-8 hover:text-destructive hover:bg-destructive/10 text-muted-foreground">
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
@@ -157,8 +157,9 @@ export default function LabelsPage() {
                 </div>
               ))}
               {labels.length === 0 && (
-                <div className="p-12 text-center text-muted-foreground">
-                  No labels exist yet.
+                <div className="p-16 text-center text-muted-foreground flex flex-col items-center">
+                  <Tags className="w-10 h-10 mb-4 opacity-20" />
+                  <p className="text-sm font-medium">No labels found</p>
                 </div>
               )}
             </div>
@@ -167,50 +168,54 @@ export default function LabelsPage() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] rounded-2xl">
           <DialogHeader>
             <DialogTitle>{editingLabel ? 'Edit Label' : 'Create Label'}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-5 py-4">
             <div className="grid gap-2">
-              <UILabel htmlFor="name">Name</UILabel>
+              <UILabel htmlFor="name" className="text-xs uppercase tracking-wider text-muted-foreground">Name</UILabel>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="e.g. Invoices"
+                className="h-10 rounded-xl"
               />
             </div>
             <div className="grid gap-2">
-              <UILabel htmlFor="color">Color</UILabel>
-              <div className="flex gap-2">
+              <UILabel htmlFor="color" className="text-xs uppercase tracking-wider text-muted-foreground">Color</UILabel>
+              <div className="flex gap-3">
+                <div className="relative overflow-hidden rounded-xl h-10 w-16 border border-input shrink-0 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                  <input
+                    id="color"
+                    type="color"
+                    value={formData.color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    className="absolute -inset-2 w-[200%] h-[200%] cursor-pointer"
+                  />
+                </div>
                 <Input
-                  id="color"
-                  type="color"
                   value={formData.color}
                   onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  className="w-16 h-10 p-1 cursor-pointer"
-                />
-                <Input
-                  value={formData.color}
-                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  className="flex-1 font-mono uppercase"
+                  className="flex-1 font-mono uppercase h-10 rounded-xl"
                 />
               </div>
             </div>
             <div className="grid gap-2">
-              <UILabel htmlFor="description">Description (Optional)</UILabel>
+              <UILabel htmlFor="description" className="text-xs uppercase tracking-wider text-muted-foreground">Description <span className="text-muted-foreground/50 lowercase normal-case">(optional)</span></UILabel>
               <Input
                 id="description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="What is this label for?"
+                className="h-10 rounded-xl"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!formData.name.trim() || createLabel.isPending || updateLabel.isPending}>
+            <Button variant="ghost" onClick={() => setIsDialogOpen(false)} className="rounded-xl">Cancel</Button>
+            <Button onClick={handleSave} disabled={!formData.name.trim() || createLabel.isPending || updateLabel.isPending} className="rounded-xl px-6">
               Save Label
             </Button>
           </DialogFooter>

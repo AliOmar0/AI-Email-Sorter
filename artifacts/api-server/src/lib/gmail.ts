@@ -1,4 +1,5 @@
 import { google, type gmail_v1, type Auth } from "googleapis";
+import sanitizeHtml from "sanitize-html";
 import { nearestGmailColor, contrastTextColor } from "./gmailColors";
 
 type OAuth2Client = Auth.OAuth2Client;
@@ -19,6 +20,7 @@ export interface ApiEmail {
   subject: string;
   snippet: string;
   body: string;
+  bodyHtml: string;
   receivedAt: string;
   isRead: boolean;
   isStarred: boolean;
@@ -85,8 +87,85 @@ function decodeBody(data: string): string {
   return Buffer.from(data, "base64").toString("utf8");
 }
 
-function extractBody(payload: gmail_v1.Schema$MessagePart | undefined): string {
-  if (!payload) return "";
+interface ExtractedBody {
+  // Sanitized HTML suitable for rendering in an isolated frame; "" if none.
+  html: string;
+  // Plain-text rendering for previews and AI context.
+  text: string;
+}
+
+// Safe inline-style property allowlist. Deliberately excludes anything that can
+// fetch external resources or break layout out of the frame (background-image,
+// position, etc.) — only visual/text formatting is permitted, with strict value
+// patterns so no url()/expression() payloads slip through.
+const COLOR = [/^#[0-9a-f]{3,8}$/i, /^rgba?\([\d.,\s%]+\)$/i, /^[a-z]+$/i];
+const LENGTH = [/^[\d.]+(?:px|em|rem|%|pt)$/i];
+const ALLOWED_STYLES = {
+  "*": {
+    color: COLOR,
+    "background-color": COLOR,
+    "text-align": [/^(left|right|center|justify)$/i],
+    "text-decoration": [/^[\w\s-]+$/i],
+    "font-size": LENGTH,
+    "font-weight": [/^(normal|bold|bolder|lighter|\d{3})$/i],
+    "font-style": [/^(normal|italic|oblique)$/i],
+    "font-family": [/^[\w\s,'"-]+$/i],
+    "line-height": [/^[\d.]+(?:px|em|rem|%)?$/i],
+    padding: [/^[\d.\s]+(?:px|em|rem|%)?$/i],
+    margin: [/^[\d.\s]+(?:px|em|rem|%)?(?:\sauto)?$/i],
+    width: LENGTH,
+    "max-width": LENGTH,
+    height: LENGTH,
+    border: [/^[\w\s#(),.%-]+$/i],
+    "border-radius": [/^[\d.\s]+(?:px|em|rem|%)?$/i],
+  },
+};
+
+// Whitelist-based HTML sanitization for untrusted email bodies: strips scripts,
+// <style>, event handlers, iframes, forms, etc. Keeps common formatting plus
+// (https) links and images (incl. inline data: images) so the email still reads
+// like the sender intended. Output is additionally rendered inside a sandboxed,
+// script-less iframe on the client.
+function sanitizeEmailHtml(raw: string): string {
+  return sanitizeHtml(raw, {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+      "img",
+      "center",
+      "font",
+    ]),
+    allowedAttributes: {
+      "*": ["style", "align", "width", "height", "bgcolor", "color"],
+      a: ["href", "name", "target", "rel"],
+      img: ["src", "alt", "width", "height", "style"],
+      font: ["color", "face", "size"],
+    },
+    allowedStyles: ALLOWED_STYLES,
+    // Links may only point to safe schemes; inline data: URLs are confined to
+    // image sources so they cannot be used as clickable navigation targets.
+    allowedSchemes: ["https", "mailto", "tel"],
+    allowedSchemesByTag: { img: ["https", "data"] },
+    transformTags: {
+      a: sanitizeHtml.simpleTransform("a", {
+        target: "_blank",
+        rel: "noopener noreferrer",
+      }),
+    },
+  });
+}
+
+// Convert an HTML fragment to readable plain text (used when no text/plain part
+// exists and for AI context, where markup is noise).
+function htmlToText(raw: string): string {
+  return sanitizeHtml(raw, { allowedTags: [], allowedAttributes: {} })
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function extractBody(
+  payload: gmail_v1.Schema$MessagePart | undefined,
+): ExtractedBody {
+  if (!payload) return { html: "", text: "" };
   const htmlParts: string[] = [];
   const textParts: string[] = [];
 
@@ -100,9 +179,11 @@ function extractBody(payload: gmail_v1.Schema$MessagePart | undefined): string {
   };
   walk(payload);
 
-  if (htmlParts.length > 0) return htmlParts.join("\n");
-  if (textParts.length > 0) return textParts.join("\n");
-  return "";
+  const rawHtml = htmlParts.join("\n");
+  const rawText = textParts.join("\n");
+  const html = rawHtml ? sanitizeEmailHtml(rawHtml) : "";
+  const text = rawText.trim() || (rawHtml ? htmlToText(rawHtml) : "");
+  return { html, text };
 }
 
 async function getLabelIndex(
@@ -126,14 +207,20 @@ function mapEmailLabels(
   labelIds: string[],
   index: Map<string, LabelIndexEntry>,
 ): ApiLabel[] {
-  const result: ApiLabel[] = [];
+  // Dedupe by display name: Gmail's CATEGORY_* tabs (e.g. CATEGORY_PROMOTIONS)
+  // pretty-print to the same name as a user's own label ("Promotions"), which
+  // otherwise renders two identical badges. Prefer the user label over the
+  // system category when names collide.
+  const byName = new Map<string, ApiLabel>();
   for (const id of labelIds) {
     const entry = index.get(id);
     if (!entry) continue;
-    const visible =
-      !entry.isSystem || id.startsWith("CATEGORY_");
+    const visible = !entry.isSystem || id.startsWith("CATEGORY_");
     if (!visible) continue;
-    result.push({
+    const key = entry.name.toLowerCase();
+    const existing = byName.get(key);
+    if (existing && existing.isSystem === false) continue;
+    byName.set(key, {
       id: entry.id,
       name: entry.name,
       color: entry.color,
@@ -142,13 +229,13 @@ function mapEmailLabels(
       emailCount: 0,
     });
   }
-  return result;
+  return [...byName.values()];
 }
 
 function toApiEmail(
   m: gmail_v1.Schema$Message,
   index: Map<string, LabelIndexEntry>,
-  body: string,
+  body: ExtractedBody,
 ): ApiEmail {
   const headers = m.payload?.headers;
   const { sender, senderEmail } = parseFrom(header(headers, "From"));
@@ -162,7 +249,8 @@ function toApiEmail(
     senderEmail,
     subject: header(headers, "Subject"),
     snippet: m.snippet ?? "",
-    body: body || m.snippet || "",
+    body: body.text || m.snippet || "",
+    bodyHtml: body.html,
     receivedAt,
     isRead: !labelIds.includes("UNREAD"),
     isStarred: labelIds.includes("STARRED"),
@@ -221,7 +309,7 @@ export async function listEmails(
         .then((r) => r.data),
     ),
   );
-  return msgs.map((m) => toApiEmail(m, index, ""));
+  return msgs.map((m) => toApiEmail(m, index, { html: "", text: "" }));
 }
 
 export async function getEmail(
@@ -339,7 +427,7 @@ export async function bulkLabel(
         .then((r) => r.data),
     ),
   );
-  return msgs.map((m) => toApiEmail(m, index, ""));
+  return msgs.map((m) => toApiEmail(m, index, { html: "", text: "" }));
 }
 
 export async function listLabels(auth: OAuth2Client): Promise<ApiLabel[]> {

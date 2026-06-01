@@ -14,18 +14,18 @@ export function LabelBadge({ label, onRemove, className, size = "sm" }: LabelBad
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border border-black/5 dark:border-white/5 font-medium shadow-2xs",
-        size === "sm" ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs",
+        "inline-flex items-center gap-1.5 rounded-[6px] border border-black/5 dark:border-white/5 font-medium whitespace-nowrap",
+        size === "sm" ? "px-1.5 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs",
         className
       )}
       style={{
         backgroundColor: `${color}15`,
         color: color,
-        borderColor: `${color}30`,
+        borderColor: `${color}25`,
       }}
     >
       <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
-      {label.name}
+      <span className="truncate">{label.name}</span>
       {onRemove && (
         <button
           onClick={(e) => {
@@ -33,7 +33,7 @@ export function LabelBadge({ label, onRemove, className, size = "sm" }: LabelBad
             e.stopPropagation();
             onRemove();
           }}
-          className="ml-0.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-full p-0.5 transition-colors"
+          className="ml-0.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-full p-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <X className="w-3 h-3" />
         </button>

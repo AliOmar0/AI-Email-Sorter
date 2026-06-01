@@ -7,46 +7,62 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-background relative overflow-hidden">
-      <div className="absolute inset-0 z-0 pointer-events-none bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-background to-background"></div>
+    <div className="flex min-h-[100dvh] w-full flex-col bg-background relative overflow-hidden items-center justify-center font-sans text-foreground">
+      {/* Abstract Background Elements */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-[30%] -right-[10%] w-[70%] h-[70%] rounded-full bg-primary/5 blur-[120px]" />
+        <div className="absolute -bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-muted/50 blur-[100px]" />
+      </div>
       
-      <div className="flex flex-1 items-center justify-center p-6 relative z-10">
-        <div className="w-full max-w-md space-y-8">
-          <div className="flex flex-col items-center text-center space-y-4">
-            <div className="h-16 w-16 bg-sidebar rounded-2xl flex items-center justify-center shadow-lg border border-border">
-              <Sparkles className="h-8 w-8 text-primary" />
-            </div>
-            <div className="space-y-2">
-              <h1 className="text-4xl font-bold tracking-tight text-foreground font-sans">
-                Inbox AI
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-[300px] mx-auto">
-                The intelligent command center for your overflowing inbox.
-              </p>
-            </div>
+      <div className="flex flex-col items-center justify-center p-6 relative z-10 w-full max-w-sm">
+        
+        {/* Brand Header */}
+        <div className="flex flex-col items-center text-center space-y-6 mb-10">
+          <div className="h-16 w-16 bg-card rounded-2xl flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-border/50">
+            <Sparkles className="h-7 w-7 text-primary" strokeWidth={1.5} />
           </div>
-
-          <div className="bg-card p-8 rounded-2xl border border-border shadow-sm space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-sm font-medium text-foreground">
-                <Mail className="h-5 w-5 text-primary" />
-                Connect your real Gmail inbox
-              </div>
-              <ul className="space-y-3 text-sm text-muted-foreground ml-8 list-disc">
-                <li>DeepSeek AI-powered categorization</li>
-                <li>Context-aware bulk labeling</li>
-                <li>Instant, confident organization</li>
-              </ul>
-            </div>
-
-            <Button 
-              className="w-full h-12 text-base font-semibold" 
-              onClick={handleLogin}
-            >
-              Continue with Google
-            </Button>
+          <div className="space-y-3">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground">
+              Inbox AI
+            </h1>
+            <p className="text-base text-muted-foreground max-w-[280px] mx-auto leading-relaxed">
+              The intelligent command center for your overflowing inbox.
+            </p>
           </div>
         </div>
+
+        {/* Login Card */}
+        <div className="w-full bg-card/60 backdrop-blur-xl p-8 rounded-3xl border border-border/50 shadow-[0_8px_40px_rgb(0,0,0,0.04)] space-y-8 relative overflow-hidden">
+          
+          <div className="space-y-5 relative z-10">
+            <div className="flex items-center gap-3 text-sm font-medium text-foreground border-b border-border/40 pb-4">
+              <Mail className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+              Connect your real Gmail inbox
+            </div>
+            <ul className="space-y-4 text-sm text-muted-foreground/80 font-medium">
+              <li className="flex items-center gap-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                DeepSeek AI categorization
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                Context-aware bulk labeling
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                Instant, confident organization
+              </li>
+            </ul>
+          </div>
+
+          <Button 
+            className="w-full h-12 text-sm font-medium rounded-xl relative z-10 shadow-sm" 
+            onClick={handleLogin}
+          >
+            Continue with Google
+          </Button>
+        </div>
+
       </div>
     </div>
   );

@@ -22,22 +22,24 @@ export function Sidebar({ user }: { user: User }) {
   };
 
   const navItems = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/", label: "Overview", icon: LayoutDashboard },
     { href: "/inbox", label: "Inbox", icon: Inbox },
     { href: "/labels", label: "Labels", icon: Tags },
     { href: "/ai", label: "AI Studio", icon: Sparkles },
   ];
 
   return (
-    <div className="w-64 border-r border-border bg-sidebar h-screen flex flex-col text-sidebar-foreground">
-      <div className="h-14 flex items-center px-6 border-b border-sidebar-border/50 shrink-0">
-        <div className="flex items-center gap-2 text-primary font-bold text-lg">
-          <Sparkles className="w-5 h-5" />
+    <div className="w-64 border-r border-sidebar-border bg-sidebar h-screen flex flex-col text-sidebar-foreground shrink-0">
+      <div className="h-16 flex items-center px-6 shrink-0 mt-2">
+        <div className="flex items-center gap-3 font-semibold text-lg tracking-tight text-sidebar-foreground">
+          <div className="w-8 h-8 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center shadow-sm">
+            <Sparkles className="w-4 h-4" />
+          </div>
           <span>Inbox AI</span>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-4">
+      <div className="flex-1 overflow-y-auto py-6 flex flex-col gap-8">
         <div className="px-4 space-y-1">
           {navItems.map((item) => {
             const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
@@ -46,10 +48,10 @@ export function Sidebar({ user }: { user: User }) {
               <Link key={item.href} href={item.href}>
                 <div
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all",
                     isActive
-                      ? "bg-sidebar-primary/10 text-sidebar-primary"
-                      : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/70"
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                      : "hover:bg-sidebar-accent/50 text-sidebar-foreground/80 hover:text-sidebar-foreground"
                   )}
                 >
                   <Icon className="w-4 h-4" />
@@ -60,50 +62,55 @@ export function Sidebar({ user }: { user: User }) {
           })}
         </div>
 
-        <div className="mt-8 px-4">
-          <div className="px-3 mb-2 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
-            Labels
+        <div className="px-4 flex-1">
+          <div className="px-3 mb-3 text-[10px] font-bold text-sidebar-foreground/40 uppercase tracking-wider">
+            Your Labels
           </div>
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {labels.map((label) => (
               <Link key={label.id} href={`/inbox?labelId=${label.id}`}>
                 <div
-                  className="flex items-center justify-between px-3 py-1.5 rounded-md text-sm cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-sidebar-foreground/70 group"
+                  className="flex items-center justify-between px-3 py-2 rounded-xl text-sm cursor-pointer hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground transition-all group"
                 >
-                  <div className="flex items-center gap-2 truncate">
+                  <div className="flex items-center gap-3 truncate">
                     <span 
-                      className="w-2.5 h-2.5 rounded-full shrink-0" 
+                      className="w-2 h-2 rounded-full shrink-0" 
                       style={{ backgroundColor: label.color || '#888' }} 
                     />
-                    <span className="truncate">{label.name}</span>
+                    <span className="truncate font-medium">{label.name}</span>
                   </div>
                   {label.emailCount > 0 && (
-                    <span className="text-xs bg-sidebar-accent/50 px-1.5 rounded-full text-sidebar-foreground/50 group-hover:text-sidebar-foreground/70">
+                    <span className="text-[10px] bg-sidebar-accent px-1.5 py-0.5 rounded-[4px] text-sidebar-foreground/60 font-mono font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                       {label.emailCount}
                     </span>
                   )}
                 </div>
               </Link>
             ))}
+            {labels.length === 0 && (
+              <div className="px-3 py-2 text-xs text-sidebar-foreground/40">
+                No labels created yet.
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="p-4 border-t border-sidebar-border/50 shrink-0">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-md">
-          <Avatar className="h-9 w-9 border border-sidebar-border">
-            {user.picture ? <AvatarImage src={user.picture} alt={user.name} /> : null}
-            <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground">
+      <div className="p-4 shrink-0">
+        <div className="flex items-center gap-3 px-3 py-3 rounded-xl border border-sidebar-border bg-sidebar-accent/30 shadow-sm">
+          <Avatar className="h-9 w-9 rounded-lg border border-sidebar-border/50">
+            {user.picture ? <AvatarImage src={user.picture} alt={user.name} className="rounded-lg" /> : null}
+            <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground rounded-lg text-xs font-semibold">
               {user.name.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground truncate">{user.name}</p>
-            <p className="text-xs text-sidebar-foreground/50 truncate">{user.email}</p>
+            <p className="text-sm font-semibold text-sidebar-foreground truncate">{user.name}</p>
+            <p className="text-[11px] text-sidebar-foreground/60 truncate font-medium">{user.email}</p>
           </div>
           <button 
             onClick={handleLogout}
-            className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors"
+            className="p-2 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors shrink-0"
             title="Log out"
           >
             <LogOut className="h-4 w-4" />

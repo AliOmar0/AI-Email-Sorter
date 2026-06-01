@@ -445,6 +445,7 @@ components:
         - subject
         - snippet
         - body
+        - bodyHtml
         - receivedAt
         - isRead
         - isStarred
@@ -462,6 +463,10 @@ components:
           type: string
         body:
           type: string
+          description: Plain-text rendering of the email body (HTML stripped). Used for previews and AI context.
+        bodyHtml:
+          type: string
+          description: Sanitized HTML body for rich display. Empty string when the email has no HTML part.
         receivedAt:
           type: string
           format: date-time
