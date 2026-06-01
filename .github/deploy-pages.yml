@@ -1,0 +1,77 @@
+# ⚠️ This file is intentionally NOT in .github/workflows/.
+#
+# GitHub blocks pushing files under .github/workflows/ unless the Git token has
+# the special "workflow" scope, which the Replit GitHub integration token does
+# not have — that is what causes the push to be rejected.
+#
+# TO ACTIVATE: create this as a workflow through the GitHub web UI (which has the
+# right permissions), then it will run on every push to main:
+#   1. On GitHub: Add file -> Create new file
+#   2. Name it exactly:  .github/workflows/deploy-pages.yml
+#   3. Paste the contents below (everything after this comment block)
+#   4. Commit directly to main
+#
+# See DEPLOYMENT.md, "Deploy the frontend (GitHub Pages)" for full context.
+
+name: Deploy frontend to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; cancel in-progress runs for the same ref.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        env:
+          NODE_ENV: production
+          # vite.config.ts requires PORT even for builds; any value works.
+          PORT: "5000"
+          # Project page is served under /<repo-name>/ on github.io.
+          BASE_PATH: "/${{ github.event.repository.name }}/"
+          # Set this repository variable to your deployed Vercel backend URL,
+          # e.g. https://your-backend.vercel.app
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: pnpm --filter @workspace/inbox-ai run build
+
+      - name: Add SPA fallback for client-side routing
+        run: cp artifacts/inbox-ai/dist/public/index.html artifacts/inbox-ai/dist/public/404.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: artifacts/inbox-ai/dist/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

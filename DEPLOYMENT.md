@@ -93,12 +93,20 @@ refresh tokens expire after 7 days.
 2. In **Settings → Secrets and variables → Actions → Variables**, add a
    repository **variable**:
    - `VITE_API_BASE_URL` = your backend URL, e.g. `https://your-backend.vercel.app`
-3. The workflow `.github/workflows/deploy-pages.yml` runs on every push to
-   `main`. It builds the frontend with:
-   - `BASE_PATH=/<repo-name>/` (derived automatically from the repo name)
-   - `VITE_API_BASE_URL` (from the variable above)
+3. **Create the GitHub Actions workflow via the GitHub web UI.** The workflow
+   content lives in this repo at **`.github/deploy-pages.yml`** (deliberately
+   *not* under `.github/workflows/`). Most Git tokens — including Replit's —
+   cannot push files into `.github/workflows/` without a special `workflow`
+   permission scope, and the push gets rejected. To work around that:
+   - On GitHub: **Add file → Create new file**
+   - Name it exactly `.github/workflows/deploy-pages.yml`
+   - Copy the contents of `.github/deploy-pages.yml` (skip the leading comment
+     block) into it
+   - **Commit directly to `main`**
 
-   and publishes `artifacts/inbox-ai/dist/public` to Pages.
+   The workflow then runs on every push to `main`, building the frontend with
+   `BASE_PATH=/<repo-name>/` and `VITE_API_BASE_URL` (from the variable above)
+   and publishing `artifacts/inbox-ai/dist/public` to Pages.
 4. After the first successful run, your app is live at
    `https://username.github.io/repo-name/`.
 
