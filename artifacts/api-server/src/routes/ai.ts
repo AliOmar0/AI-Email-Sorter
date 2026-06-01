@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, emailsTable, emailLabelsTable } from "@workspace/db";
 import { eq, inArray, notInArray } from "drizzle-orm";
 import { AutoLabelEmailsBody, SuggestEmailGroupsBody } from "@workspace/api-zod";
-import { getOpenAI, isOpenAIConfigured, AI_MODEL } from "../lib/openai";
+import { getAIClient, isAIConfigured, AI_MODEL } from "../lib/aiClient";
 import { listLabelsWithCounts, type ApiLabel } from "../lib/emailRepo";
 
 const router: IRouter = Router();
@@ -40,8 +40,8 @@ function extractJson(text: string): unknown {
 }
 
 router.post("/ai/suggest-labels/:id", async (req, res) => {
-  if (!isOpenAIConfigured())
-    return res.status(503).json({ error: "OpenAI API key not configured" });
+  if (!isAIConfigured())
+    return res.status(503).json({ error: "AI provider not configured" });
 
   const id = Number(req.params.id);
   if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -70,7 +70,7 @@ Return a JSON array (max 4 items) of suggestions, ordered by relevance. Each ite
 Prefer existing labels when they fit. Only propose a new label when nothing existing fits well. Respond with JSON only.`;
 
   try {
-    const completion = await getOpenAI().chat.completions.create({
+    const completion = await getAIClient().chat.completions.create({
       model: AI_MODEL,
       messages: [{ role: "user", content: prompt }],
     });
@@ -106,8 +106,8 @@ Prefer existing labels when they fit. Only propose a new label when nothing exis
 });
 
 router.post("/ai/auto-label", async (req, res) => {
-  if (!isOpenAIConfigured())
-    return res.status(503).json({ error: "OpenAI API key not configured" });
+  if (!isAIConfigured())
+    return res.status(503).json({ error: "AI provider not configured" });
 
   const body = AutoLabelEmailsBody.parse(req.body);
   const labels = await listLabelsWithCounts();
@@ -147,7 +147,7 @@ ${emailContext(email)}
 
 Respond with a JSON object: {"labelIds": [<id>, ...]}. JSON only.`;
     try {
-      const completion = await getOpenAI().chat.completions.create({
+      const completion = await getAIClient().chat.completions.create({
         model: AI_MODEL,
         messages: [{ role: "user", content: prompt }],
       });
@@ -182,8 +182,8 @@ Respond with a JSON object: {"labelIds": [<id>, ...]}. JSON only.`;
 });
 
 router.post("/ai/group-suggestions", async (req, res) => {
-  if (!isOpenAIConfigured())
-    return res.status(503).json({ error: "OpenAI API key not configured" });
+  if (!isAIConfigured())
+    return res.status(503).json({ error: "AI provider not configured" });
 
   const body = SuggestEmailGroupsBody.parse(req.body);
 
@@ -223,7 +223,7 @@ Return a JSON array (2-5 groups). Each item:
 Only include emails from the list above. Skip emails that don't fit any group. JSON only.`;
 
   try {
-    const completion = await getOpenAI().chat.completions.create({
+    const completion = await getAIClient().chat.completions.create({
       model: AI_MODEL,
       messages: [{ role: "user", content: prompt }],
     });
