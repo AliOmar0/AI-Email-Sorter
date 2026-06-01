@@ -8,7 +8,7 @@
 import type { BulkLabelInputAction } from './bulkLabelInputAction';
 
 export interface BulkLabelInput {
-  emailIds: number[];
-  labelId: number;
+  emailIds: string[];
+  labelId: string;
   action: BulkLabelInputAction;
 }

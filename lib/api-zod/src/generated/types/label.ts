@@ -7,10 +7,13 @@
  */
 
 export interface Label {
-  id: number;
+  id: string;
   name: string;
-  /** A hex color string, e.g. "#6366f1" */
-  color: string;
+  /**
+     * A hex color string, e.g. "#6366f1"
+     * @nullable
+     */
+  color: string | null;
   /** @nullable */
   description?: string | null;
   isSystem: boolean;

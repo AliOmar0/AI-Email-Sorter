@@ -8,5 +8,5 @@
 
 export interface GroupSuggestInput {
   /** Emails to cluster. If omitted, all unlabeled emails are used. */
-  emailIds?: number[];
+  emailIds?: string[];
 }

@@ -10,6 +10,7 @@ interface LabelBadgeProps {
 }
 
 export function LabelBadge({ label, onRemove, className, size = "sm" }: LabelBadgeProps) {
+  const color = label.color ?? "#6b7280";
   return (
     <span
       className={cn(
@@ -18,12 +19,12 @@ export function LabelBadge({ label, onRemove, className, size = "sm" }: LabelBad
         className
       )}
       style={{
-        backgroundColor: `${label.color}15`,
-        color: label.color,
-        borderColor: `${label.color}30`,
+        backgroundColor: `${color}15`,
+        color: color,
+        borderColor: `${color}30`,
       }}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: label.color }} />
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
       {label.name}
       {onRemove && (
         <button

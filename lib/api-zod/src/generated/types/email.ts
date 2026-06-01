@@ -8,7 +8,7 @@
 import type { Label } from './label';
 
 export interface Email {
-  id: number;
+  id: string;
   sender: string;
   senderEmail: string;
   subject: string;

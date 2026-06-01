@@ -8,5 +8,5 @@
 
 export interface AutoLabelInput {
   /** Specific emails to label. If omitted, all unlabeled emails are processed. */
-  emailIds?: number[];
+  emailIds?: string[];
 }

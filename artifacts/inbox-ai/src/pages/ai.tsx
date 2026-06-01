@@ -181,7 +181,7 @@ export default function AIStudioPage() {
                         <div key={i} className="bg-background border border-border p-4 rounded-xl shadow-sm">
                           <div className="flex items-start justify-between mb-2">
                             <div>
-                              <LabelBadge label={{ name: group.suggestedLabel, color: group.suggestedColor }} size="md" />
+                              <LabelBadge label={{ name: group.suggestedLabel, color: group.suggestedColor || "#6366f1" }} size="md" />
                               <p className="text-xs text-muted-foreground mt-2">{group.reason}</p>
                             </div>
                             <span className="text-xs font-bold bg-muted px-2 py-1 rounded-md">

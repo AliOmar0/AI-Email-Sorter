@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface EmailLabelInput {
-  labelIds: string[];
+export interface User {
+  id: number;
+  email: string;
+  name: string;
+  /** @nullable */
+  picture?: string | null;
 }

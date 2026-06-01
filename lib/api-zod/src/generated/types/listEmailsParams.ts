@@ -9,15 +9,15 @@ import type { ListEmailsView } from './listEmailsView';
 
 export type ListEmailsParams = {
 /**
- * Filter to emails that have this label
+ * Filter to emails that have this Gmail label id
  */
-labelId?: number;
+labelId?: string;
 /**
  * Predefined filter view
  */
 view?: ListEmailsView;
 /**
- * Full text search across subject, sender and body
+ * Gmail search query across subject, sender and body
  */
 search?: string;
 };

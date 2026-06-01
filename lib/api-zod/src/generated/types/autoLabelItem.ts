@@ -7,6 +7,6 @@
  */
 
 export interface AutoLabelItem {
-  emailId: number;
-  appliedLabelIds: number[];
+  emailId: string;
+  appliedLabelIds: string[];
 }

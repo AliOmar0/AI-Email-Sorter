@@ -35,7 +35,8 @@ import type {
   LabelSuggestion,
   LabelUpdate,
   ListEmailsParams,
-  Stats
+  Stats,
+  User
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -128,6 +129,153 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
+export const getGetCurrentUserUrl = () => {
+
+
+
+
+  return `/api/auth/me`
+}
+
+/**
+ * @summary Get the currently authenticated user
+ */
+export const getCurrentUser = async ( options?: RequestInit): Promise<User> => {
+
+  return customFetch<User>(getGetCurrentUserUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCurrentUserQueryKey = () => {
+    return [
+    `/api/auth/me`
+    ] as const;
+    }
+
+
+export const getGetCurrentUserQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = ErrorType<Error>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCurrentUserQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentUser>>> = ({ signal }) => getCurrentUser({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCurrentUserQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
+export type GetCurrentUserQueryError = ErrorType<Error>
+
+
+/**
+ * @summary Get the currently authenticated user
+ */
+
+export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = ErrorType<Error>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCurrentUserQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getLogoutUrl = () => {
+
+
+
+
+  return `/api/auth/logout`
+}
+
+/**
+ * @summary Log out the current user
+ */
+export const logout = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getLogoutUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getLogoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof logout>>, TError,void, TContext> => {
+
+const mutationKey = ['logout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logout>>, void> = () => {
+
+
+          return  logout(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogoutMutationResult = NonNullable<Awaited<ReturnType<typeof logout>>>
+
+    export type LogoutMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Log out the current user
+ */
+export const useLogout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof logout>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getLogoutMutationOptions(options));
+    }
+
 export const getListEmailsUrl = (params?: ListEmailsParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -144,7 +292,7 @@ export const getListEmailsUrl = (params?: ListEmailsParams,) => {
 }
 
 /**
- * List emails with optional filtering by label, view, and search.
+ * List the authenticated user's Gmail messages with optional filtering by label, view, and search.
  * @summary List emails
  */
 export const listEmails = async (params?: ListEmailsParams, options?: RequestInit): Promise<Email[]> => {
@@ -213,7 +361,7 @@ export function useListEmails<TData = Awaited<ReturnType<typeof listEmails>>, TE
 
 
 
-export const getGetEmailUrl = (id: number,) => {
+export const getGetEmailUrl = (id: string,) => {
 
 
 
@@ -224,7 +372,7 @@ export const getGetEmailUrl = (id: number,) => {
 /**
  * @summary Get a single email
  */
-export const getEmail = async (id: number, options?: RequestInit): Promise<Email> => {
+export const getEmail = async (id: string, options?: RequestInit): Promise<Email> => {
 
   return customFetch<Email>(getGetEmailUrl(id),
   {
@@ -239,14 +387,14 @@ export const getEmail = async (id: number, options?: RequestInit): Promise<Email
 
 
 
-export const getGetEmailQueryKey = (id: number,) => {
+export const getGetEmailQueryKey = (id: string,) => {
     return [
     `/api/emails/${id}`
     ] as const;
     }
 
 
-export const getGetEmailQueryOptions = <TData = Awaited<ReturnType<typeof getEmail>>, TError = ErrorType<Error>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetEmailQueryOptions = <TData = Awaited<ReturnType<typeof getEmail>>, TError = ErrorType<Error>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -273,7 +421,7 @@ export type GetEmailQueryError = ErrorType<Error>
  */
 
 export function useGetEmail<TData = Awaited<ReturnType<typeof getEmail>>, TError = ErrorType<Error>>(
- id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -290,7 +438,7 @@ export function useGetEmail<TData = Awaited<ReturnType<typeof getEmail>>, TError
 
 
 
-export const getUpdateEmailUrl = (id: number,) => {
+export const getUpdateEmailUrl = (id: string,) => {
 
 
 
@@ -301,7 +449,7 @@ export const getUpdateEmailUrl = (id: number,) => {
 /**
  * @summary Update an email's read/starred state
  */
-export const updateEmail = async (id: number,
+export const updateEmail = async (id: string,
     emailUpdate: EmailUpdate, options?: RequestInit): Promise<Email> => {
 
   return customFetch<Email>(getUpdateEmailUrl(id),
@@ -318,8 +466,8 @@ export const updateEmail = async (id: number,
 
 
 export const getUpdateEmailMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEmail>>, TError,{id: number;data: BodyType<EmailUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateEmail>>, TError,{id: number;data: BodyType<EmailUpdate>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEmail>>, TError,{id: string;data: BodyType<EmailUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateEmail>>, TError,{id: string;data: BodyType<EmailUpdate>}, TContext> => {
 
 const mutationKey = ['updateEmail'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -331,7 +479,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEmail>>, {id: number;data: BodyType<EmailUpdate>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEmail>>, {id: string;data: BodyType<EmailUpdate>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  updateEmail(id,data,requestOptions)
@@ -352,17 +500,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Update an email's read/starred state
  */
 export const useUpdateEmail = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEmail>>, TError,{id: number;data: BodyType<EmailUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEmail>>, TError,{id: string;data: BodyType<EmailUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateEmail>>,
         TError,
-        {id: number;data: BodyType<EmailUpdate>},
+        {id: string;data: BodyType<EmailUpdate>},
         TContext
       > => {
       return useMutation(getUpdateEmailMutationOptions(options));
     }
 
-export const getSetEmailLabelsUrl = (id: number,) => {
+export const getSetEmailLabelsUrl = (id: string,) => {
 
 
 
@@ -371,9 +519,9 @@ export const getSetEmailLabelsUrl = (id: number,) => {
 }
 
 /**
- * @summary Replace the set of labels on an email
+ * @summary Replace the set of user labels on an email
  */
-export const setEmailLabels = async (id: number,
+export const setEmailLabels = async (id: string,
     emailLabelInput: EmailLabelInput, options?: RequestInit): Promise<Email> => {
 
   return customFetch<Email>(getSetEmailLabelsUrl(id),
@@ -390,8 +538,8 @@ export const setEmailLabels = async (id: number,
 
 
 export const getSetEmailLabelsMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEmailLabels>>, TError,{id: number;data: BodyType<EmailLabelInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof setEmailLabels>>, TError,{id: number;data: BodyType<EmailLabelInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEmailLabels>>, TError,{id: string;data: BodyType<EmailLabelInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setEmailLabels>>, TError,{id: string;data: BodyType<EmailLabelInput>}, TContext> => {
 
 const mutationKey = ['setEmailLabels'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -403,7 +551,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setEmailLabels>>, {id: number;data: BodyType<EmailLabelInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setEmailLabels>>, {id: string;data: BodyType<EmailLabelInput>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  setEmailLabels(id,data,requestOptions)
@@ -421,21 +569,21 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SetEmailLabelsMutationError = ErrorType<unknown>
 
     /**
- * @summary Replace the set of labels on an email
+ * @summary Replace the set of user labels on an email
  */
 export const useSetEmailLabels = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEmailLabels>>, TError,{id: number;data: BodyType<EmailLabelInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setEmailLabels>>, TError,{id: string;data: BodyType<EmailLabelInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof setEmailLabels>>,
         TError,
-        {id: number;data: BodyType<EmailLabelInput>},
+        {id: string;data: BodyType<EmailLabelInput>},
         TContext
       > => {
       return useMutation(getSetEmailLabelsMutationOptions(options));
     }
 
-export const getRemoveEmailLabelUrl = (id: number,
-    labelId: number,) => {
+export const getRemoveEmailLabelUrl = (id: string,
+    labelId: string,) => {
 
 
 
@@ -446,8 +594,8 @@ export const getRemoveEmailLabelUrl = (id: number,
 /**
  * @summary Remove a single label from an email
  */
-export const removeEmailLabel = async (id: number,
-    labelId: number, options?: RequestInit): Promise<Email> => {
+export const removeEmailLabel = async (id: string,
+    labelId: string, options?: RequestInit): Promise<Email> => {
 
   return customFetch<Email>(getRemoveEmailLabelUrl(id,labelId),
   {
@@ -462,8 +610,8 @@ export const removeEmailLabel = async (id: number,
 
 
 export const getRemoveEmailLabelMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeEmailLabel>>, TError,{id: number;labelId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof removeEmailLabel>>, TError,{id: number;labelId: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeEmailLabel>>, TError,{id: string;labelId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeEmailLabel>>, TError,{id: string;labelId: string}, TContext> => {
 
 const mutationKey = ['removeEmailLabel'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -475,7 +623,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeEmailLabel>>, {id: number;labelId: number}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeEmailLabel>>, {id: string;labelId: string}> = (props) => {
           const {id,labelId} = props ?? {};
 
           return  removeEmailLabel(id,labelId,requestOptions)
@@ -496,11 +644,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Remove a single label from an email
  */
 export const useRemoveEmailLabel = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeEmailLabel>>, TError,{id: number;labelId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeEmailLabel>>, TError,{id: string;labelId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof removeEmailLabel>>,
         TError,
-        {id: number;labelId: number},
+        {id: string;labelId: string},
         TContext
       > => {
       return useMutation(getRemoveEmailLabelMutationOptions(options));
@@ -725,7 +873,7 @@ export const useCreateLabel = <TError = ErrorType<unknown>,
       return useMutation(getCreateLabelMutationOptions(options));
     }
 
-export const getUpdateLabelUrl = (id: number,) => {
+export const getUpdateLabelUrl = (id: string,) => {
 
 
 
@@ -736,7 +884,7 @@ export const getUpdateLabelUrl = (id: number,) => {
 /**
  * @summary Update a label
  */
-export const updateLabel = async (id: number,
+export const updateLabel = async (id: string,
     labelUpdate: LabelUpdate, options?: RequestInit): Promise<Label> => {
 
   return customFetch<Label>(getUpdateLabelUrl(id),
@@ -753,8 +901,8 @@ export const updateLabel = async (id: number,
 
 
 export const getUpdateLabelMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLabel>>, TError,{id: number;data: BodyType<LabelUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateLabel>>, TError,{id: number;data: BodyType<LabelUpdate>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLabel>>, TError,{id: string;data: BodyType<LabelUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateLabel>>, TError,{id: string;data: BodyType<LabelUpdate>}, TContext> => {
 
 const mutationKey = ['updateLabel'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -766,7 +914,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateLabel>>, {id: number;data: BodyType<LabelUpdate>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateLabel>>, {id: string;data: BodyType<LabelUpdate>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  updateLabel(id,data,requestOptions)
@@ -787,17 +935,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Update a label
  */
 export const useUpdateLabel = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLabel>>, TError,{id: number;data: BodyType<LabelUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLabel>>, TError,{id: string;data: BodyType<LabelUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateLabel>>,
         TError,
-        {id: number;data: BodyType<LabelUpdate>},
+        {id: string;data: BodyType<LabelUpdate>},
         TContext
       > => {
       return useMutation(getUpdateLabelMutationOptions(options));
     }
 
-export const getDeleteLabelUrl = (id: number,) => {
+export const getDeleteLabelUrl = (id: string,) => {
 
 
 
@@ -808,7 +956,7 @@ export const getDeleteLabelUrl = (id: number,) => {
 /**
  * @summary Delete a label
  */
-export const deleteLabel = async (id: number, options?: RequestInit): Promise<void> => {
+export const deleteLabel = async (id: string, options?: RequestInit): Promise<void> => {
 
   return customFetch<void>(getDeleteLabelUrl(id),
   {
@@ -823,8 +971,8 @@ export const deleteLabel = async (id: number, options?: RequestInit): Promise<vo
 
 
 export const getDeleteLabelMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLabel>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteLabel>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLabel>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteLabel>>, TError,{id: string}, TContext> => {
 
 const mutationKey = ['deleteLabel'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -836,7 +984,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteLabel>>, {id: number}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteLabel>>, {id: string}> = (props) => {
           const {id} = props ?? {};
 
           return  deleteLabel(id,requestOptions)
@@ -857,17 +1005,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Delete a label
  */
 export const useDeleteLabel = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLabel>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLabel>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteLabel>>,
         TError,
-        {id: number},
+        {id: string},
         TContext
       > => {
       return useMutation(getDeleteLabelMutationOptions(options));
     }
 
-export const getSuggestEmailLabelsUrl = (id: number,) => {
+export const getSuggestEmailLabelsUrl = (id: string,) => {
 
 
 
@@ -879,7 +1027,7 @@ export const getSuggestEmailLabelsUrl = (id: number,) => {
  * Uses AI to analyze the email and suggest relevant labels from existing labels, plus brand-new label ideas.
  * @summary AI-suggested labels for a single email
  */
-export const suggestEmailLabels = async (id: number, options?: RequestInit): Promise<LabelSuggestion[]> => {
+export const suggestEmailLabels = async (id: string, options?: RequestInit): Promise<LabelSuggestion[]> => {
 
   return customFetch<LabelSuggestion[]>(getSuggestEmailLabelsUrl(id),
   {
@@ -894,8 +1042,8 @@ export const suggestEmailLabels = async (id: number, options?: RequestInit): Pro
 
 
 export const getSuggestEmailLabelsMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof suggestEmailLabels>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof suggestEmailLabels>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof suggestEmailLabels>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof suggestEmailLabels>>, TError,{id: string}, TContext> => {
 
 const mutationKey = ['suggestEmailLabels'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -907,7 +1055,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof suggestEmailLabels>>, {id: number}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof suggestEmailLabels>>, {id: string}> = (props) => {
           const {id} = props ?? {};
 
           return  suggestEmailLabels(id,requestOptions)
@@ -928,11 +1076,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary AI-suggested labels for a single email
  */
 export const useSuggestEmailLabels = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof suggestEmailLabels>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof suggestEmailLabels>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof suggestEmailLabels>>,
         TError,
-        {id: number},
+        {id: string},
         TContext
       > => {
       return useMutation(getSuggestEmailLabelsMutationOptions(options));

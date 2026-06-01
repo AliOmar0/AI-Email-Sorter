@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
   - name: emails
     description: Email browsing and management
   - name: labels
@@ -33,19 +35,47 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get the currently authenticated user
+      responses:
+        "200":
+          description: The authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Log out the current user
+      responses:
+        "204":
+          description: Logged out
+
   /emails:
     get:
       operationId: listEmails
       tags: [emails]
       summary: List emails
-      description: List emails with optional filtering by label, view, and search.
+      description: List the authenticated user's Gmail messages with optional filtering by label, view, and search.
       parameters:
         - name: labelId
           in: query
           required: false
           schema:
-            type: integer
-          description: Filter to emails that have this label
+            type: string
+          description: Filter to emails that have this Gmail label id
         - name: view
           in: query
           required: false
@@ -58,7 +88,7 @@ paths:
           required: false
           schema:
             type: string
-          description: Full text search across subject, sender and body
+          description: Gmail search query across subject, sender and body
       responses:
         "200":
           description: A list of emails
@@ -79,7 +109,7 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: The email
@@ -102,7 +132,7 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
       requestBody:
         required: true
         content:
@@ -121,13 +151,13 @@ paths:
     put:
       operationId: setEmailLabels
       tags: [emails]
-      summary: Replace the set of labels on an email
+      summary: Replace the set of user labels on an email
       parameters:
         - name: id
           in: path
           required: true
           schema:
-            type: integer
+            type: string
       requestBody:
         required: true
         content:
@@ -152,12 +182,12 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
         - name: labelId
           in: path
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: Updated email
@@ -229,7 +259,7 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
       requestBody:
         required: true
         content:
@@ -252,7 +282,7 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "204":
           description: Deleted
@@ -268,7 +298,7 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         "200":
           description: Suggestions for the email
@@ -352,16 +382,29 @@ components:
       required:
         - error
 
+    User:
+      type: object
+      required: [id, email, name]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        picture:
+          type: ["string", "null"]
+
     Label:
       type: object
       required: [id, name, color, isSystem, emailCount]
       properties:
         id:
-          type: integer
+          type: string
         name:
           type: string
         color:
-          type: string
+          type: ["string", "null"]
           description: A hex color string, e.g. "#6366f1"
         description:
           type: ["string", "null"]
@@ -408,7 +451,7 @@ components:
         - labels
       properties:
         id:
-          type: integer
+          type: string
         sender:
           type: string
         senderEmail:
@@ -446,7 +489,7 @@ components:
         labelIds:
           type: array
           items:
-            type: integer
+            type: string
 
     BulkLabelInput:
       type: object
@@ -455,9 +498,9 @@ components:
         emailIds:
           type: array
           items:
-            type: integer
+            type: string
         labelId:
-          type: integer
+          type: string
         action:
           type: string
           enum: [add, remove]
@@ -467,7 +510,7 @@ components:
       required: [name, confidence, reason, isNew]
       properties:
         labelId:
-          type: ["integer", "null"]
+          type: ["string", "null"]
           description: Set when the suggestion maps to an existing label
         name:
           type: string
@@ -488,7 +531,7 @@ components:
         emailIds:
           type: array
           items:
-            type: integer
+            type: string
           description: Specific emails to label. If omitted, all unlabeled emails are processed.
 
     AutoLabelItem:
@@ -496,11 +539,11 @@ components:
       required: [emailId, appliedLabelIds]
       properties:
         emailId:
-          type: integer
+          type: string
         appliedLabelIds:
           type: array
           items:
-            type: integer
+            type: string
 
     AutoLabelResult:
       type: object
@@ -521,7 +564,7 @@ components:
         emailIds:
           type: array
           items:
-            type: integer
+            type: string
           description: Emails to cluster. If omitted, all unlabeled emails are used.
 
     EmailGroup:
@@ -537,18 +580,18 @@ components:
         emailIds:
           type: array
           items:
-            type: integer
+            type: string
 
     LabelStat:
       type: object
       required: [id, name, color, count]
       properties:
         id:
-          type: integer
+          type: string
         name:
           type: string
         color:
-          type: string
+          type: ["string", "null"]
         count:
           type: integer
 

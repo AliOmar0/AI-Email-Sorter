@@ -80,7 +80,7 @@ export default function Dashboard() {
                   <Link key={l.id} href={`/inbox?labelId=${l.id}`}>
                     <div className="flex items-center justify-between group cursor-pointer p-2 -mx-2 rounded-lg hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: l.color }} />
+                        <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: l.color || '#888' }} />
                         <span className="font-medium text-sm group-hover:text-primary transition-colors">{l.name}</span>
                       </div>
                       <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-md">{l.count}</span>

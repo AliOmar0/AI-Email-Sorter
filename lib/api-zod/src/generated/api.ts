@@ -18,17 +18,28 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * List emails with optional filtering by label, view, and search.
+ * @summary Get the currently authenticated user
+ */
+export const GetCurrentUserResponse = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "picture": zod.string().nullish()
+})
+
+
+/**
+ * List the authenticated user's Gmail messages with optional filtering by label, view, and search.
  * @summary List emails
  */
 export const ListEmailsQueryParams = zod.object({
-  "labelId": zod.coerce.number().optional().describe('Filter to emails that have this label'),
+  "labelId": zod.coerce.string().optional().describe('Filter to emails that have this Gmail label id'),
   "view": zod.enum(['all', 'unlabeled', 'starred', 'unread']).optional().describe('Predefined filter view'),
-  "search": zod.coerce.string().optional().describe('Full text search across subject, sender and body')
+  "search": zod.coerce.string().optional().describe('Gmail search query across subject, sender and body')
 })
 
 export const ListEmailsResponseItem = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "sender": zod.string(),
   "senderEmail": zod.string(),
   "subject": zod.string(),
@@ -38,9 +49,9 @@ export const ListEmailsResponseItem = zod.object({
   "isRead": zod.boolean(),
   "isStarred": zod.boolean(),
   "labels": zod.array(zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "name": zod.string(),
-  "color": zod.string().describe('A hex color string, e.g. \"#6366f1\"'),
+  "color": zod.string().nullable().describe('A hex color string, e.g. \"#6366f1\"'),
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
@@ -53,11 +64,11 @@ export const ListEmailsResponse = zod.array(ListEmailsResponseItem)
  * @summary Get a single email
  */
 export const GetEmailParams = zod.object({
-  "id": zod.coerce.number()
+  "id": zod.coerce.string()
 })
 
 export const GetEmailResponse = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "sender": zod.string(),
   "senderEmail": zod.string(),
   "subject": zod.string(),
@@ -67,9 +78,9 @@ export const GetEmailResponse = zod.object({
   "isRead": zod.boolean(),
   "isStarred": zod.boolean(),
   "labels": zod.array(zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "name": zod.string(),
-  "color": zod.string().describe('A hex color string, e.g. \"#6366f1\"'),
+  "color": zod.string().nullable().describe('A hex color string, e.g. \"#6366f1\"'),
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
@@ -81,7 +92,7 @@ export const GetEmailResponse = zod.object({
  * @summary Update an email's read/starred state
  */
 export const UpdateEmailParams = zod.object({
-  "id": zod.coerce.number()
+  "id": zod.coerce.string()
 })
 
 export const UpdateEmailBody = zod.object({
@@ -90,7 +101,7 @@ export const UpdateEmailBody = zod.object({
 })
 
 export const UpdateEmailResponse = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "sender": zod.string(),
   "senderEmail": zod.string(),
   "subject": zod.string(),
@@ -100,9 +111,9 @@ export const UpdateEmailResponse = zod.object({
   "isRead": zod.boolean(),
   "isStarred": zod.boolean(),
   "labels": zod.array(zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "name": zod.string(),
-  "color": zod.string().describe('A hex color string, e.g. \"#6366f1\"'),
+  "color": zod.string().nullable().describe('A hex color string, e.g. \"#6366f1\"'),
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
@@ -111,18 +122,18 @@ export const UpdateEmailResponse = zod.object({
 
 
 /**
- * @summary Replace the set of labels on an email
+ * @summary Replace the set of user labels on an email
  */
 export const SetEmailLabelsParams = zod.object({
-  "id": zod.coerce.number()
+  "id": zod.coerce.string()
 })
 
 export const SetEmailLabelsBody = zod.object({
-  "labelIds": zod.array(zod.number())
+  "labelIds": zod.array(zod.string())
 })
 
 export const SetEmailLabelsResponse = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "sender": zod.string(),
   "senderEmail": zod.string(),
   "subject": zod.string(),
@@ -132,9 +143,9 @@ export const SetEmailLabelsResponse = zod.object({
   "isRead": zod.boolean(),
   "isStarred": zod.boolean(),
   "labels": zod.array(zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "name": zod.string(),
-  "color": zod.string().describe('A hex color string, e.g. \"#6366f1\"'),
+  "color": zod.string().nullable().describe('A hex color string, e.g. \"#6366f1\"'),
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
@@ -146,12 +157,12 @@ export const SetEmailLabelsResponse = zod.object({
  * @summary Remove a single label from an email
  */
 export const RemoveEmailLabelParams = zod.object({
-  "id": zod.coerce.number(),
-  "labelId": zod.coerce.number()
+  "id": zod.coerce.string(),
+  "labelId": zod.coerce.string()
 })
 
 export const RemoveEmailLabelResponse = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "sender": zod.string(),
   "senderEmail": zod.string(),
   "subject": zod.string(),
@@ -161,9 +172,9 @@ export const RemoveEmailLabelResponse = zod.object({
   "isRead": zod.boolean(),
   "isStarred": zod.boolean(),
   "labels": zod.array(zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "name": zod.string(),
-  "color": zod.string().describe('A hex color string, e.g. \"#6366f1\"'),
+  "color": zod.string().nullable().describe('A hex color string, e.g. \"#6366f1\"'),
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
@@ -175,13 +186,13 @@ export const RemoveEmailLabelResponse = zod.object({
  * @summary Apply or remove labels across multiple emails
  */
 export const BulkLabelEmailsBody = zod.object({
-  "emailIds": zod.array(zod.number()),
-  "labelId": zod.number(),
+  "emailIds": zod.array(zod.string()),
+  "labelId": zod.string(),
   "action": zod.enum(['add', 'remove'])
 })
 
 export const BulkLabelEmailsResponseItem = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "sender": zod.string(),
   "senderEmail": zod.string(),
   "subject": zod.string(),
@@ -191,9 +202,9 @@ export const BulkLabelEmailsResponseItem = zod.object({
   "isRead": zod.boolean(),
   "isStarred": zod.boolean(),
   "labels": zod.array(zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "name": zod.string(),
-  "color": zod.string().describe('A hex color string, e.g. \"#6366f1\"'),
+  "color": zod.string().nullable().describe('A hex color string, e.g. \"#6366f1\"'),
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
@@ -206,9 +217,9 @@ export const BulkLabelEmailsResponse = zod.array(BulkLabelEmailsResponseItem)
  * @summary List labels with email counts
  */
 export const ListLabelsResponseItem = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "name": zod.string(),
-  "color": zod.string().describe('A hex color string, e.g. \"#6366f1\"'),
+  "color": zod.string().nullable().describe('A hex color string, e.g. \"#6366f1\"'),
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
@@ -233,7 +244,7 @@ export const CreateLabelBody = zod.object({
  * @summary Update a label
  */
 export const UpdateLabelParams = zod.object({
-  "id": zod.coerce.number()
+  "id": zod.coerce.string()
 })
 
 
@@ -246,9 +257,9 @@ export const UpdateLabelBody = zod.object({
 })
 
 export const UpdateLabelResponse = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "name": zod.string(),
-  "color": zod.string().describe('A hex color string, e.g. \"#6366f1\"'),
+  "color": zod.string().nullable().describe('A hex color string, e.g. \"#6366f1\"'),
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
@@ -259,7 +270,7 @@ export const UpdateLabelResponse = zod.object({
  * @summary Delete a label
  */
 export const DeleteLabelParams = zod.object({
-  "id": zod.coerce.number()
+  "id": zod.coerce.string()
 })
 
 
@@ -268,11 +279,11 @@ export const DeleteLabelParams = zod.object({
  * @summary AI-suggested labels for a single email
  */
 export const SuggestEmailLabelsParams = zod.object({
-  "id": zod.coerce.number()
+  "id": zod.coerce.string()
 })
 
 export const SuggestEmailLabelsResponseItem = zod.object({
-  "labelId": zod.number().nullish().describe('Set when the suggestion maps to an existing label'),
+  "labelId": zod.string().nullish().describe('Set when the suggestion maps to an existing label'),
   "name": zod.string(),
   "color": zod.string().nullish(),
   "confidence": zod.number().describe('0 to 1 confidence score'),
@@ -287,15 +298,15 @@ export const SuggestEmailLabelsResponse = zod.array(SuggestEmailLabelsResponseIt
  * @summary Automatically label emails with AI
  */
 export const AutoLabelEmailsBody = zod.object({
-  "emailIds": zod.array(zod.number()).optional().describe('Specific emails to label. If omitted, all unlabeled emails are processed.')
+  "emailIds": zod.array(zod.string()).optional().describe('Specific emails to label. If omitted, all unlabeled emails are processed.')
 })
 
 export const AutoLabelEmailsResponse = zod.object({
   "processed": zod.number(),
   "labeled": zod.number(),
   "items": zod.array(zod.object({
-  "emailId": zod.number(),
-  "appliedLabelIds": zod.array(zod.number())
+  "emailId": zod.string(),
+  "appliedLabelIds": zod.array(zod.string())
 }))
 })
 
@@ -305,14 +316,14 @@ export const AutoLabelEmailsResponse = zod.object({
  * @summary AI-suggested groups of similar emails
  */
 export const SuggestEmailGroupsBody = zod.object({
-  "emailIds": zod.array(zod.number()).optional().describe('Emails to cluster. If omitted, all unlabeled emails are used.')
+  "emailIds": zod.array(zod.string()).optional().describe('Emails to cluster. If omitted, all unlabeled emails are used.')
 })
 
 export const SuggestEmailGroupsResponseItem = zod.object({
   "suggestedLabel": zod.string(),
   "suggestedColor": zod.string(),
   "reason": zod.string(),
-  "emailIds": zod.array(zod.number())
+  "emailIds": zod.array(zod.string())
 })
 export const SuggestEmailGroupsResponse = zod.array(SuggestEmailGroupsResponseItem)
 
@@ -328,9 +339,9 @@ export const GetStatsResponse = zod.object({
   "starredCount": zod.number(),
   "labelCount": zod.number(),
   "labelBreakdown": zod.array(zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "name": zod.string(),
-  "color": zod.string(),
+  "color": zod.string().nullable(),
   "count": zod.number()
 }))
 })

@@ -10,5 +10,5 @@ export interface EmailGroup {
   suggestedLabel: string;
   suggestedColor: string;
   reason: string;
-  emailIds: number[];
+  emailIds: string[];
 }

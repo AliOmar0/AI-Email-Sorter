@@ -41,7 +41,7 @@ export default function LabelsPage() {
     setEditingLabel(label);
     setFormData({ 
       name: label.name, 
-      color: label.color, 
+      color: label.color || "#6366f1", 
       description: label.description || "" 
     });
     setIsDialogOpen(true);
@@ -78,7 +78,7 @@ export default function LabelsPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this label?")) return;
     try {
       await deleteLabel.mutateAsync({ id });
@@ -120,7 +120,7 @@ export default function LabelsPage() {
               {labels.map((label) => (
                 <div key={label.id} className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm" style={{ backgroundColor: `${label.color}15`, color: label.color }}>
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm" style={{ backgroundColor: `${label.color || '#888'}15`, color: label.color || '#888' }}>
                       <Tags className="w-5 h-5" />
                     </div>
                     <div>

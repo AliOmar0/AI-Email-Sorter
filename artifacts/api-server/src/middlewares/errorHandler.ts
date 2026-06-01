@@ -31,6 +31,24 @@ export function errorHandler(
     return;
   }
 
+  // Google/Gmail (gaxios) errors
+  const e = err as {
+    response?: { status?: number; data?: { error?: unknown } };
+  };
+  const gaxStatus = e?.response?.status;
+  const gaxError = e?.response?.data?.error;
+  if (gaxError === "invalid_grant" || gaxStatus === 401) {
+    res
+      .status(401)
+      .json({ error: "Google session expired, please sign in again" });
+    return;
+  }
+  if (typeof gaxStatus === "number" && gaxStatus >= 400 && gaxStatus < 500) {
+    req.log.warn({ err }, "Upstream Google API error");
+    res.status(gaxStatus).json({ error: "Gmail request failed" });
+    return;
+  }
+
   const code = findPgCode(err);
   if (code === "23503") {
     res.status(400).json({ error: "Referenced record does not exist" });

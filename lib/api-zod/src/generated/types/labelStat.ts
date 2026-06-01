@@ -7,8 +7,9 @@
  */
 
 export interface LabelStat {
-  id: number;
+  id: string;
   name: string;
-  color: string;
+  /** @nullable */
+  color: string | null;
   count: number;
 }

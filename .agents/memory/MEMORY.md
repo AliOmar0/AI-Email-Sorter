@@ -1,1 +1,2 @@
 - [Zod error handling](zod-error-handling.md) — Express error handler must import ZodError from "zod" (v3 root, matches Orval schemas), and unwrap drizzle-wrapped pg error codes via .cause.
+- [Gmail-backed architecture](gmail-backed-architecture.md) — Inbox AI quirks: SESSION_SECRET also encrypts tokens; bounded recent-window caps for list/stats/AI; OAuth state guard; gmail.modify verification limits.

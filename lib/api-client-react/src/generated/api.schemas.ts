@@ -13,11 +13,22 @@ export interface Error {
   error: string;
 }
 
-export interface Label {
+export interface User {
   id: number;
+  email: string;
   name: string;
-  /** A hex color string, e.g. "#6366f1" */
-  color: string;
+  /** @nullable */
+  picture?: string | null;
+}
+
+export interface Label {
+  id: string;
+  name: string;
+  /**
+     * A hex color string, e.g. "#6366f1"
+     * @nullable
+     */
+  color: string | null;
   /** @nullable */
   description?: string | null;
   isSystem: boolean;
@@ -40,7 +51,7 @@ export interface LabelUpdate {
 }
 
 export interface Email {
-  id: number;
+  id: string;
   sender: string;
   senderEmail: string;
   subject: string;
@@ -58,7 +69,7 @@ export interface EmailUpdate {
 }
 
 export interface EmailLabelInput {
-  labelIds: number[];
+  labelIds: string[];
 }
 
 export type BulkLabelInputAction = typeof BulkLabelInputAction[keyof typeof BulkLabelInputAction];
@@ -70,8 +81,8 @@ export const BulkLabelInputAction = {
 } as const;
 
 export interface BulkLabelInput {
-  emailIds: number[];
-  labelId: number;
+  emailIds: string[];
+  labelId: string;
   action: BulkLabelInputAction;
 }
 
@@ -80,7 +91,7 @@ export interface LabelSuggestion {
      * Set when the suggestion maps to an existing label
      * @nullable
      */
-  labelId?: number | null;
+  labelId?: string | null;
   name: string;
   /** @nullable */
   color?: string | null;
@@ -93,12 +104,12 @@ export interface LabelSuggestion {
 
 export interface AutoLabelInput {
   /** Specific emails to label. If omitted, all unlabeled emails are processed. */
-  emailIds?: number[];
+  emailIds?: string[];
 }
 
 export interface AutoLabelItem {
-  emailId: number;
-  appliedLabelIds: number[];
+  emailId: string;
+  appliedLabelIds: string[];
 }
 
 export interface AutoLabelResult {
@@ -109,20 +120,21 @@ export interface AutoLabelResult {
 
 export interface GroupSuggestInput {
   /** Emails to cluster. If omitted, all unlabeled emails are used. */
-  emailIds?: number[];
+  emailIds?: string[];
 }
 
 export interface EmailGroup {
   suggestedLabel: string;
   suggestedColor: string;
   reason: string;
-  emailIds: number[];
+  emailIds: string[];
 }
 
 export interface LabelStat {
-  id: number;
+  id: string;
   name: string;
-  color: string;
+  /** @nullable */
+  color: string | null;
   count: number;
 }
 
@@ -138,15 +150,15 @@ export interface Stats {
 
 export type ListEmailsParams = {
 /**
- * Filter to emails that have this label
+ * Filter to emails that have this Gmail label id
  */
-labelId?: number;
+labelId?: string;
 /**
  * Predefined filter view
  */
 view?: ListEmailsView;
 /**
- * Full text search across subject, sender and body
+ * Gmail search query across subject, sender and body
  */
 search?: string;
 };

@@ -19,9 +19,8 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { 
-  Search, Star, Inbox as InboxIcon, Tags, Filter, MoreVertical, 
-  Trash2, Archive, CheckSquare, Sparkles, X, Loader2,
-  Mail
+  Search, Star, Inbox as InboxIcon, Tags, Filter, 
+  CheckSquare, Sparkles, X, Loader2, Mail
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,21 +31,19 @@ import { cn } from "@/lib/utils";
 import { LabelBadge } from "@/components/labels/label-badge";
 import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useLocation } from "wouter";
 
 export default function InboxPage() {
-  const [location] = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
   const viewParam = searchParams.get("view") as ListEmailsView | null;
   const labelIdParam = searchParams.get("labelId");
   
   const [view, setView] = useState<ListEmailsView>(viewParam || "all");
-  const [labelIdFilter, setLabelIdFilter] = useState<number | undefined>(labelIdParam ? parseInt(labelIdParam) : undefined);
+  const [labelIdFilter, setLabelIdFilter] = useState<string | undefined>(labelIdParam || undefined);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   
-  const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
-  const [activeEmailId, setActiveEmailId] = useState<number | null>(null);
+  const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set());
+  const [activeEmailId, setActiveEmailId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -63,7 +60,6 @@ export default function InboxPage() {
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
-    // Debounce would normally go here, simplifying for now
     setTimeout(() => setDebouncedSearch(e.target.value), 300);
   };
 
@@ -75,7 +71,7 @@ export default function InboxPage() {
     }
   };
 
-  const toggleSelect = (id: number) => {
+  const toggleSelect = (id: string) => {
     const newSet = new Set(selectedEmailIds);
     if (newSet.has(id)) {
       newSet.delete(id);
@@ -90,7 +86,7 @@ export default function InboxPage() {
     queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() });
   };
 
-  const handleBulkAction = async (action: "add" | "remove", targetLabelId: number) => {
+  const handleBulkAction = async (action: "add" | "remove", targetLabelId: string) => {
     if (selectedEmailIds.size === 0) return;
     
     try {
@@ -126,7 +122,6 @@ export default function InboxPage() {
             value={search}
             onChange={handleSearch}
             className="w-full bg-background"
-            prefix={<Search className="w-4 h-4 text-muted-foreground" />}
           />
         </div>
         <ScrollArea className="flex-1">
@@ -160,7 +155,7 @@ export default function InboxPage() {
                 )}
               >
                 <div className="flex items-center gap-3 truncate">
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: label.color }} />
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: label.color || '#888' }} />
                   <span className="truncate">{label.name}</span>
                 </div>
                 {label.emailCount > 0 && (
@@ -202,7 +197,7 @@ export default function InboxPage() {
                   <DropdownMenuSeparator />
                   {labels.map(l => (
                     <DropdownMenuItem key={l.id} onClick={() => handleBulkAction("add", l.id)}>
-                      <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: l.color }} />
+                      <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: l.color || '#888' }} />
                       {l.name}
                     </DropdownMenuItem>
                   ))}
@@ -211,7 +206,7 @@ export default function InboxPage() {
                   <DropdownMenuSeparator />
                   {labels.map(l => (
                     <DropdownMenuItem key={l.id} onClick={() => handleBulkAction("remove", l.id)}>
-                      <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: l.color }} />
+                      <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: l.color || '#888' }} />
                       {l.name}
                     </DropdownMenuItem>
                   ))}
@@ -265,7 +260,7 @@ export default function InboxPage() {
                         {email.sender}
                       </span>
                       <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap ml-2">
-                        {format(new Date(email.receivedAt), 'MMM d, h:mm a')}
+                        {format(new Date(email.receivedAt), 'MMM d')}
                       </span>
                     </div>
                     
@@ -311,7 +306,7 @@ export default function InboxPage() {
   );
 }
 
-function EmailDetail({ emailId, labels, onClose }: { emailId: number, labels: Label[], onClose: () => void }) {
+function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: Label[], onClose: () => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
@@ -321,10 +316,6 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: number, labels: La
       queryKey: getGetEmailQueryKey(emailId) 
     } 
   });
-
-  const { data: suggestions, isLoading: isSuggesting } = useSuggestEmailLabels(
-    { mutation: { mutationKey: ["suggest", emailId] } }
-  );
 
   const suggestLabels = useSuggestEmailLabels();
   const removeLabel = useRemoveEmailLabel();
@@ -348,7 +339,7 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: number, labels: La
     );
   }
 
-  const handleRemoveLabel = async (labelId: number) => {
+  const handleRemoveLabel = async (labelId: string) => {
     try {
       await removeLabel.mutateAsync({ id: email.id, labelId });
       queryClient.invalidateQueries({ queryKey: getGetEmailQueryKey(email.id) });
@@ -446,7 +437,7 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: number, labels: La
                   key={l.id} 
                   onClick={() => setLabels.mutate({ id: email.id, data: { labelIds: [...email.labels.map(el => el.id), l.id] } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetEmailQueryKey(email.id) }); queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() }); }})}
                 >
-                  <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: l.color }} />
+                  <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: l.color || '#888' }} />
                   {l.name}
                 </DropdownMenuItem>
               ))}

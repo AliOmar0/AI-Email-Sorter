@@ -26,3 +26,4 @@ export * from './labelUpdate';
 export * from './listEmailsParams';
 export * from './listEmailsView';
 export * from './stats';
+export * from './user';

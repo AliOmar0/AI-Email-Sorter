@@ -1,11 +1,25 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Inbox, Tags, Sparkles, Inbox as InboxIcon } from "lucide-react";
+import { LayoutDashboard, Inbox, Tags, Sparkles, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useListLabels, getListLabelsQueryKey } from "@workspace/api-client-react";
+import { useListLabels, getListLabelsQueryKey, User, useLogout } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-export function Sidebar() {
-  const [location] = useLocation();
+export function Sidebar({ user }: { user: User }) {
+  const [location, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const { data: labels = [] } = useListLabels({ query: { queryKey: getListLabelsQueryKey() } });
+  
+  const logout = useLogout();
+
+  const handleLogout = () => {
+    logout.mutate(undefined, {
+      onSuccess: () => {
+        queryClient.clear();
+        setLocation("/");
+      }
+    });
+  };
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -16,7 +30,7 @@ export function Sidebar() {
 
   return (
     <div className="w-64 border-r border-border bg-sidebar h-screen flex flex-col text-sidebar-foreground">
-      <div className="h-14 flex items-center px-6 border-b border-sidebar-border/50">
+      <div className="h-14 flex items-center px-6 border-b border-sidebar-border/50 shrink-0">
         <div className="flex items-center gap-2 text-primary font-bold text-lg">
           <Sparkles className="w-5 h-5" />
           <span>Inbox AI</span>
@@ -59,7 +73,7 @@ export function Sidebar() {
                   <div className="flex items-center gap-2 truncate">
                     <span 
                       className="w-2.5 h-2.5 rounded-full shrink-0" 
-                      style={{ backgroundColor: label.color }} 
+                      style={{ backgroundColor: label.color || '#888' }} 
                     />
                     <span className="truncate">{label.name}</span>
                   </div>
@@ -72,6 +86,28 @@ export function Sidebar() {
               </Link>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="p-4 border-t border-sidebar-border/50 shrink-0">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-md">
+          <Avatar className="h-9 w-9 border border-sidebar-border">
+            {user.picture ? <AvatarImage src={user.picture} alt={user.name} /> : null}
+            <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground">
+              {user.name.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-sidebar-foreground truncate">{user.name}</p>
+            <p className="text-xs text-sidebar-foreground/50 truncate">{user.email}</p>
+          </div>
+          <button 
+            onClick={handleLogout}
+            className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors"
+            title="Log out"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </div>

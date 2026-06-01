@@ -11,7 +11,7 @@ export interface LabelSuggestion {
      * Set when the suggestion maps to an existing label
      * @nullable
      */
-  labelId?: number | null;
+  labelId?: string | null;
   name: string;
   /** @nullable */
   color?: string | null;
