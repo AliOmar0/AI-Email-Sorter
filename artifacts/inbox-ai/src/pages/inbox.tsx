@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import type { ImperativePanelHandle } from "react-resizable-panels";
 import { 
   useListEmails, 
   getListEmailsQueryKey, 
@@ -20,13 +21,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { 
   Search, Star, Inbox as InboxIcon, Tags, Filter, 
-  CheckSquare, Sparkles, X, Loader2, Mail
+  CheckSquare, Sparkles, X, Loader2, Mail,
+  PanelLeftClose, PanelLeftOpen
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { LabelBadge } from "@/components/labels/label-badge";
 import { EmailBody } from "@/components/inbox/email-body";
@@ -45,6 +49,19 @@ export default function InboxPage() {
   
   const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set());
   const [activeEmailId, setActiveEmailId] = useState<string | null>(null);
+
+  const filterPanelRef = useRef<ImperativePanelHandle>(null);
+  const [filterCollapsed, setFilterCollapsed] = useState(false);
+
+  const toggleFilterPanel = () => {
+    const panel = filterPanelRef.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) {
+      panel.expand();
+    } else {
+      panel.collapse();
+    }
+  };
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -114,9 +131,24 @@ export default function InboxPage() {
   };
 
   return (
-    <div className="flex h-full w-full bg-background">
-      {/* Left Sidebar - Views & Labels */}
-      <div className="w-60 border-r border-border bg-muted/10 flex flex-col shrink-0">
+    <ResizablePanelGroup
+      direction="horizontal"
+      autoSaveId="inbox-panels"
+      className="h-full w-full bg-background"
+    >
+      {/* Left Panel - Views & Labels (resizable + collapsible) */}
+      <ResizablePanel
+        ref={filterPanelRef}
+        collapsible
+        collapsedSize={0}
+        minSize={14}
+        defaultSize={18}
+        maxSize={28}
+        onCollapse={() => setFilterCollapsed(true)}
+        onExpand={() => setFilterCollapsed(false)}
+        className="bg-muted/10"
+      >
+        <div className="h-full flex flex-col min-w-0">
         <div className="p-4 border-b border-border/50">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -174,12 +206,30 @@ export default function InboxPage() {
             ))}
           </div>
         </ScrollArea>
-      </div>
+        </div>
+      </ResizablePanel>
 
-      {/* Middle - Email List */}
-      <div className="flex-1 flex flex-col border-r border-border min-w-[320px] max-w-[450px]">
+      <ResizableHandle withHandle />
+
+      {/* Middle Panel - Email List (resizable) */}
+      <ResizablePanel defaultSize={34} minSize={24}>
+        <div className="h-full flex flex-col min-w-0">
         <div className="h-14 border-b border-border/50 flex items-center justify-between px-4 bg-background z-10 shrink-0">
           <div className="flex items-center gap-3">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleFilterPanel}
+                  className="h-8 w-8 -ml-1 text-muted-foreground hover:text-foreground"
+                  aria-label={filterCollapsed ? "Show filters" : "Hide filters"}
+                >
+                  {filterCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{filterCollapsed ? "Show filters" : "Hide filters"}</TooltipContent>
+            </Tooltip>
             <Checkbox 
               checked={emails.length > 0 && selectedEmailIds.size === emails.length}
               onCheckedChange={toggleSelectAll}
@@ -307,10 +357,14 @@ export default function InboxPage() {
             </div>
           )}
         </ScrollArea>
-      </div>
+        </div>
+      </ResizablePanel>
 
-      {/* Right - Reading Pane */}
-      <div className="flex-[1.5] flex flex-col bg-background relative z-0">
+      <ResizableHandle withHandle />
+
+      {/* Right Panel - Reading Pane (resizable) */}
+      <ResizablePanel defaultSize={48} minSize={30}>
+        <div className="h-full flex flex-col bg-background relative z-0 min-w-0">
         {activeEmailId ? (
           <EmailDetail 
             emailId={activeEmailId} 
@@ -325,8 +379,9 @@ export default function InboxPage() {
             <p className="text-sm">Select an email to read</p>
           </div>
         )}
-      </div>
-    </div>
+        </div>
+      </ResizablePanel>
+    </ResizablePanelGroup>
   );
 }
 

@@ -1,9 +1,31 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Inbox, Tags, Sparkles, LogOut } from "lucide-react";
+import { LayoutDashboard, Inbox, Tags, Sparkles, LogOut, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { useListLabels, getListLabelsQueryKey, User, useLogout } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  const isDark = resolvedTheme === "dark";
+
+  return (
+    <button
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      className="p-2 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors shrink-0"
+      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label="Toggle theme"
+    >
+      {mounted && isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  );
+}
 
 export function Sidebar({ user }: { user: User }) {
   const [location, setLocation] = useLocation();
@@ -30,13 +52,14 @@ export function Sidebar({ user }: { user: User }) {
 
   return (
     <div className="w-64 border-r border-sidebar-border bg-sidebar h-screen flex flex-col text-sidebar-foreground shrink-0">
-      <div className="h-16 flex items-center px-6 shrink-0 mt-2">
+      <div className="h-16 flex items-center justify-between px-6 shrink-0 mt-2">
         <div className="flex items-center gap-3 font-semibold text-lg tracking-tight text-sidebar-foreground">
           <div className="w-8 h-8 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center shadow-sm">
             <Sparkles className="w-4 h-4" />
           </div>
           <span>Inbox AI</span>
         </div>
+        <ThemeToggle />
       </div>
 
       <div className="flex-1 overflow-y-auto py-6 flex flex-col gap-8">
