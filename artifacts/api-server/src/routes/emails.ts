@@ -94,14 +94,22 @@ router.put("/emails/:id/labels", async (req, res) => {
   if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
   const body = SetEmailLabelsBody.parse(req.body);
 
-  await db.delete(emailLabelsTable).where(eq(emailLabelsTable.emailId, id));
+  const [exists] = await db
+    .select({ id: emailsTable.id })
+    .from(emailsTable)
+    .where(eq(emailsTable.id, id));
+  if (!exists) return res.status(404).json({ error: "Email not found" });
+
   const unique = [...new Set(body.labelIds)];
-  if (unique.length > 0) {
-    await db
-      .insert(emailLabelsTable)
-      .values(unique.map((labelId) => ({ emailId: id, labelId })))
-      .onConflictDoNothing();
-  }
+  await db.transaction(async (tx) => {
+    await tx.delete(emailLabelsTable).where(eq(emailLabelsTable.emailId, id));
+    if (unique.length > 0) {
+      await tx
+        .insert(emailLabelsTable)
+        .values(unique.map((labelId) => ({ emailId: id, labelId })))
+        .onConflictDoNothing();
+    }
+  });
 
   const email = await getEmailById(id);
   if (!email) return res.status(404).json({ error: "Email not found" });

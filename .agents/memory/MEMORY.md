@@ -1,0 +1,1 @@
+- [Zod error handling](zod-error-handling.md) — Express error handler must import ZodError from "zod" (v3 root, matches Orval schemas), and unwrap drizzle-wrapped pg error codes via .cause.
