@@ -78,6 +78,8 @@ export function Sidebar({ user }: { user: User }) {
     });
   };
 
+  const activeLabelId = new URLSearchParams(searchString).get("labelId");
+
   const navItems = [
     { href: "/", label: "Overview", icon: LayoutDashboard },
     { href: "/inbox", label: "Inbox", icon: Inbox },
@@ -118,7 +120,12 @@ export function Sidebar({ user }: { user: User }) {
       <div className="flex-1 overflow-y-auto py-6 flex flex-col gap-8">
         <div className="px-4 space-y-1">
           {navItems.map((item) => {
-            const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
+            const matchesPath =
+              location === item.href || (item.href !== "/" && location.startsWith(item.href));
+            // When viewing a specific label, the Inbox item is "All mail" and shouldn't
+            // claim the active state — the matching label below owns it instead.
+            const isActive =
+              item.href === "/inbox" ? matchesPath && !activeLabelId : matchesPath;
             const Icon = item.icon;
             return (
               <Link key={item.href} href={item.href}>
@@ -143,26 +150,37 @@ export function Sidebar({ user }: { user: User }) {
             Your Labels
           </div>
           <div className="space-y-0.5">
-            {labels.map((label) => (
-              <Link key={label.id} href={`/inbox?labelId=${label.id}`}>
-                <div
-                  className="flex items-center justify-between px-3 py-2 rounded-xl text-sm cursor-pointer hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground transition-all group"
-                >
-                  <div className="flex items-center gap-3 truncate">
-                    <span 
-                      className="w-2 h-2 rounded-full shrink-0" 
-                      style={{ backgroundColor: label.color || '#888' }} 
-                    />
-                    <span className="truncate font-medium">{label.name}</span>
+            {labels.map((label) => {
+              const isActive = activeLabelId === label.id;
+              return (
+                <Link key={label.id} href={`/inbox?labelId=${label.id}`}>
+                  <div
+                    className={cn(
+                      "flex items-center justify-between px-3 py-2 rounded-xl text-sm cursor-pointer transition-all group",
+                      isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                        : "hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 truncate">
+                      <span 
+                        className="w-2 h-2 rounded-full shrink-0" 
+                        style={{ backgroundColor: label.color || '#888' }} 
+                      />
+                      <span className="truncate font-medium">{label.name}</span>
+                    </div>
+                    {label.emailCount > 0 && (
+                      <span className={cn(
+                        "text-[10px] bg-sidebar-accent px-1.5 py-0.5 rounded-[4px] text-sidebar-foreground/60 font-mono font-medium transition-opacity",
+                        isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                      )}>
+                        {label.emailCount}
+                      </span>
+                    )}
                   </div>
-                  {label.emailCount > 0 && (
-                    <span className="text-[10px] bg-sidebar-accent px-1.5 py-0.5 rounded-[4px] text-sidebar-foreground/60 font-mono font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                      {label.emailCount}
-                    </span>
-                  )}
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
             {labels.length === 0 && (
               <div className="px-3 py-2 text-xs text-sidebar-foreground/40">
                 No labels created yet.
