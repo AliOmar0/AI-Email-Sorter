@@ -76,6 +76,7 @@ export default function InboxPage() {
 
   const updateEmail = useUpdateEmail();
   const bulkLabel = useBulkLabelEmails();
+  const createLabel = useCreateLabel();
 
   const activeLabel = labelIdFilter ? labels.find((l) => l.id === labelIdFilter) : undefined;
 
@@ -148,6 +149,23 @@ export default function InboxPage() {
     }
   };
 
+  const handleBulkCreateAndApply = async (name: string) => {
+    if (selectedEmailIds.size === 0) return;
+    try {
+      const newLabel = await createLabel.mutateAsync({
+        data: { name, color: "#6366f1" }
+      });
+      queryClient.invalidateQueries({ queryKey: getListLabelsQueryKey() });
+      await handleBulkAction("add", newLabel.id);
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: "Failed to create label.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const emailListPanel = (
     <div className="h-full flex flex-col min-w-0">
       <div className="border-b border-border/50 bg-background z-10 shrink-0">
@@ -199,6 +217,7 @@ export default function InboxPage() {
                     Label
                   </Button>
                 }
+                onCreate={handleBulkCreateAndApply}
                 sections={[
                   {
                     heading: "Apply Label",
@@ -438,6 +457,31 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
     );
   };
 
+  const handleCreateAndApply = async (name: string) => {
+    try {
+      const newLabel = await createLabel.mutateAsync({
+        data: { name, color: "#6366f1" }
+      });
+      queryClient.invalidateQueries({ queryKey: getListLabelsQueryKey() });
+      await setLabels.mutateAsync({
+        id: email.id,
+        data: { labelIds: [...email.labels.map(el => el.id), newLabel.id] }
+      });
+      queryClient.invalidateQueries({ queryKey: getGetEmailQueryKey(email.id) });
+      queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() });
+      toast({
+        title: "Label created",
+        description: `Created and applied "${name}".`
+      });
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: "Failed to create label.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleApplySuggestion = async (suggestion: any) => {
     try {
       let targetLabelId = suggestion.labelId;
@@ -523,6 +567,7 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
                 Add Label
               </Button>
             }
+            onCreate={handleCreateAndApply}
             sections={[
               {
                 heading: "Available Labels",
@@ -554,6 +599,7 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
                 <Tags className="w-4 h-4" />
               </Button>
             }
+            onCreate={handleCreateAndApply}
             sections={[
               {
                 heading: "Add Label",
