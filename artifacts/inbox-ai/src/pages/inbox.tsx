@@ -190,10 +190,10 @@ export default function InboxPage() {
           </div>
           
           {selectedEmailIds.size > 0 && (
-            <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 animate-in fade-in zoom-in-95 duration-200">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 gap-2 border-border/60 shadow-none">
+                  <Button variant="outline" size="sm" className="h-9 sm:h-8 gap-2 px-3 border-border/60 shadow-none">
                     <Tags className="w-3.5 h-3.5" />
                     Label
                   </Button>
@@ -218,6 +218,16 @@ export default function InboxPage() {
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSelectedEmailIds(new Set())}
+                aria-label="Clear selection"
+                title="Clear selection"
+                className="h-9 w-9 sm:h-8 sm:w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full"
+              >
+                <X className="w-4 h-4" />
+              </Button>
             </div>
           )}
         </div>
