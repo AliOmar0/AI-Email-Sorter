@@ -91,18 +91,18 @@ export default function LabelsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-background selection:bg-primary/10">
-      <div className="max-w-4xl mx-auto p-8 lg:p-12 space-y-10">
-        <div className="flex items-center justify-between">
+      <div className="max-w-4xl mx-auto p-4 sm:p-8 lg:p-12 space-y-6 sm:space-y-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-              <Tags className="w-7 h-7 text-muted-foreground" />
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+              <Tags className="w-6 h-6 sm:w-7 sm:h-7 text-muted-foreground shrink-0" />
               Manage Labels
             </h1>
             <p className="text-muted-foreground text-sm">
               Organize and categorize your inbox with custom tags.
             </p>
           </div>
-          <Button onClick={handleOpenCreate} className="gap-2 shadow-sm rounded-xl h-10 px-5">
+          <Button onClick={handleOpenCreate} className="gap-2 shadow-sm rounded-xl h-10 px-5 w-full sm:w-auto shrink-0">
             <Plus className="w-4 h-4" />
             Create Label
           </Button>
@@ -118,13 +118,13 @@ export default function LabelsPage() {
           ) : (
             <div className="divide-y divide-border/40">
               {labels.map((label) => (
-                <div key={label.id} className="flex items-center justify-between p-5 hover:bg-muted/30 transition-colors group">
-                  <div className="flex items-center gap-5">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-muted/50 border border-border/50">
+                <div key={label.id} className="flex items-center justify-between gap-3 p-4 sm:p-5 hover:bg-muted/30 transition-colors group">
+                  <div className="flex items-center gap-3 sm:gap-5 min-w-0">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-muted/50 border border-border/50 shrink-0">
                       <div className="w-3 h-3 rounded-full" style={{ backgroundColor: label.color || '#888' }} />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
                         <LabelBadge label={label} size="md" />
                         {label.isSystem && (
                           <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted px-2 py-0.5 rounded-[4px]">
@@ -134,18 +134,18 @@ export default function LabelsPage() {
                         )}
                       </div>
                       {label.description && (
-                        <p className="text-sm text-muted-foreground">{label.description}</p>
+                        <p className="text-sm text-muted-foreground truncate">{label.description}</p>
                       )}
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-3 sm:gap-6 shrink-0">
                     <div className="text-right flex flex-col items-end">
                       <p className="text-lg font-semibold tabular-nums text-foreground">{label.emailCount}</p>
                       <p className="text-[10px] uppercase font-medium text-muted-foreground tracking-wider">Emails</p>
                     </div>
                     
-                    <div className="flex items-center gap-1 border-l border-border/50 pl-4 h-10">
+                    <div className="flex items-center gap-1 border-l border-border/50 pl-2 sm:pl-4 h-10">
                       <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(label)} disabled={label.isSystem} className="rounded-full w-8 h-8 text-muted-foreground hover:text-foreground">
                         <Edit2 className="w-4 h-4" />
                       </Button>

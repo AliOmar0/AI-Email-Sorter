@@ -87,49 +87,49 @@ export default function AIStudioPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-background">
-      <div className="max-w-5xl mx-auto p-8 lg:p-12 space-y-12">
-        <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 border-b border-border/50 pb-8">
+      <div className="max-w-5xl mx-auto p-4 sm:p-8 lg:p-12 space-y-8 sm:space-y-12">
+        <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-4 sm:gap-6 border-b border-border/50 pb-6 sm:pb-8">
           <div className="space-y-2">
-            <h1 className="text-4xl font-bold tracking-tight text-foreground flex items-center gap-3">
-              <Sparkles className="w-8 h-8 text-foreground" />
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground flex items-center gap-3">
+              <Sparkles className="w-7 h-7 sm:w-8 sm:h-8 text-foreground shrink-0" />
               AI Studio
             </h1>
-            <p className="text-muted-foreground text-base max-w-lg">
+            <p className="text-muted-foreground text-sm sm:text-base max-w-lg">
               Let the AI analyze your inbox, recognize patterns, and automatically organize your emails.
             </p>
           </div>
           {stats && (
-            <div className="bg-muted/40 rounded-2xl border border-border/50 px-6 py-4 flex flex-col items-end shadow-sm">
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Unlabeled Emails</span>
-              <span className="text-3xl font-bold tracking-tight text-foreground">{stats.unlabeledCount}</span>
+            <div className="bg-muted/40 rounded-2xl border border-border/50 px-5 py-3 sm:px-6 sm:py-4 flex flex-row md:flex-col items-center md:items-end justify-between gap-3 md:gap-0 w-full md:w-auto shadow-sm">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider md:mb-1">Unlabeled Emails</span>
+              <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{stats.unlabeledCount}</span>
             </div>
           )}
         </div>
 
         {activeTab === "overview" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
             {/* Auto-Label Card */}
             <Card className="border-border/60 shadow-sm rounded-3xl relative overflow-hidden flex flex-col">
               <div className="absolute top-0 right-0 p-8 opacity-[0.02] pointer-events-none">
                 <Wand2 className="w-48 h-48" />
               </div>
-              <CardHeader className="relative z-10 p-8 pb-4">
-                <div className="w-12 h-12 bg-foreground rounded-xl flex items-center justify-center mb-6 shadow-sm">
+              <CardHeader className="relative z-10 p-6 sm:p-8 pb-4 sm:pb-4">
+                <div className="w-12 h-12 bg-foreground rounded-xl flex items-center justify-center mb-4 sm:mb-6 shadow-sm">
                   <BrainCircuit className="w-6 h-6 text-background" />
                 </div>
-                <CardTitle className="text-2xl">Magic Auto-Label</CardTitle>
-                <CardDescription className="text-base mt-2">
+                <CardTitle className="text-xl sm:text-2xl">Magic Auto-Label</CardTitle>
+                <CardDescription className="text-sm sm:text-base mt-2">
                   The AI reads all your unlabeled emails and automatically applies the best existing labels. Fast and effortless.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 relative z-10 px-8">
+              <CardContent className="flex-1 relative z-10 px-6 sm:px-8">
                 <ul className="space-y-3 text-sm text-muted-foreground/80 font-medium">
                   <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-foreground/50" /> Matches against your existing labels</li>
                   <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-foreground/50" /> Analyzes full email context</li>
                   <li className="flex items-center gap-3"><CheckCircle2 className="w-4 h-4 text-foreground/50" /> Skips uncertain emails automatically</li>
                 </ul>
               </CardContent>
-              <CardFooter className="relative z-10 p-8 pt-6">
+              <CardFooter className="relative z-10 p-6 sm:p-8 pt-6">
                 <Button 
                   className="w-full h-12 rounded-xl text-base font-medium shadow-sm" 
                   onClick={handleRunAutoLabel}
@@ -146,16 +146,16 @@ export default function AIStudioPage() {
 
             {/* Smart Groups Card */}
             <Card className="border-border/60 shadow-sm rounded-3xl flex flex-col">
-              <CardHeader className="p-8 pb-4">
-                <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center mb-6 border border-border/50">
+              <CardHeader className="p-6 sm:p-8 pb-4 sm:pb-4">
+                <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center mb-4 sm:mb-6 border border-border/50">
                   <Layers className="w-6 h-6 text-muted-foreground" />
                 </div>
-                <CardTitle className="text-2xl">Discover Smart Groups</CardTitle>
-                <CardDescription className="text-base mt-2">
+                <CardTitle className="text-xl sm:text-2xl">Discover Smart Groups</CardTitle>
+                <CardDescription className="text-sm sm:text-base mt-2">
                   The AI finds patterns in your unlabeled emails and suggests new labels to group them.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 px-8 pb-0">
+              <CardContent className="flex-1 px-6 sm:px-8 pb-0">
                 {!suggestGroups.isPending && !suggestGroups.isSuccess && (
                   <p className="text-sm text-muted-foreground">
                     Perfect for when your inbox has grown out of control and you need fresh ideas on how to categorize it.
@@ -204,7 +204,7 @@ export default function AIStudioPage() {
                 )}
               </CardContent>
               {!suggestGroups.isSuccess && (
-                <CardFooter className="p-8 pt-6 mt-auto">
+                <CardFooter className="p-6 sm:p-8 pt-6 mt-auto">
                   <Button 
                     variant="outline"
                     className="w-full h-12 rounded-xl text-base font-medium shadow-sm border-border/60" 
@@ -225,24 +225,24 @@ export default function AIStudioPage() {
               <ArrowRight className="w-4 h-4 rotate-180" /> Back to Studio
             </Button>
             
-            <div className="bg-card border border-border/60 rounded-[2rem] p-12 text-center relative overflow-hidden shadow-sm">
+            <div className="bg-card border border-border/60 rounded-[2rem] p-6 sm:p-12 text-center relative overflow-hidden shadow-sm">
               <div className="absolute inset-0 bg-gradient-to-b from-muted/30 to-transparent pointer-events-none" />
-              <div className="w-24 h-24 bg-foreground rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-sm relative z-10">
-                <CheckCircle2 className="w-10 h-10 text-background" />
+              <div className="w-20 h-20 sm:w-24 sm:h-24 bg-foreground rounded-2xl flex items-center justify-center mx-auto mb-6 sm:mb-8 shadow-sm relative z-10">
+                <CheckCircle2 className="w-9 h-9 sm:w-10 sm:h-10 text-background" />
               </div>
-              <h2 className="text-4xl font-bold mb-3 tracking-tight relative z-10">Auto-Label Complete</h2>
-              <p className="text-lg text-muted-foreground max-w-md mx-auto relative z-10">
+              <h2 className="text-2xl sm:text-4xl font-bold mb-3 tracking-tight relative z-10">Auto-Label Complete</h2>
+              <p className="text-base sm:text-lg text-muted-foreground max-w-md mx-auto relative z-10">
                 Analyzed <span className="font-medium text-foreground">{autoLabelResult.processed}</span> emails and successfully categorized <span className="font-medium text-foreground">{autoLabelResult.labeled}</span>.
               </p>
               
-              <div className="grid grid-cols-2 gap-6 max-w-sm mx-auto mt-10 relative z-10">
-                <div className="bg-muted/40 rounded-2xl p-5 border border-border/50">
+              <div className="grid grid-cols-2 gap-4 sm:gap-6 max-w-sm mx-auto mt-8 sm:mt-10 relative z-10">
+                <div className="bg-muted/40 rounded-2xl p-4 sm:p-5 border border-border/50">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Processed</p>
-                  <p className="text-4xl font-bold tracking-tight">{autoLabelResult.processed}</p>
+                  <p className="text-3xl sm:text-4xl font-bold tracking-tight">{autoLabelResult.processed}</p>
                 </div>
-                <div className="bg-background rounded-2xl p-5 border border-border/80 shadow-sm">
+                <div className="bg-background rounded-2xl p-4 sm:p-5 border border-border/80 shadow-sm">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-foreground mb-1">Labeled</p>
-                  <p className="text-4xl font-bold tracking-tight text-foreground">{autoLabelResult.labeled}</p>
+                  <p className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">{autoLabelResult.labeled}</p>
                 </div>
               </div>
             </div>
