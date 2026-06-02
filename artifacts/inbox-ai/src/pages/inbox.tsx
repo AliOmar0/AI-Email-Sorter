@@ -150,16 +150,41 @@ export default function InboxPage() {
     <div className="h-full flex flex-col min-w-0">
       <div className="border-b border-border/50 bg-background z-10 shrink-0">
         <div className="h-14 flex items-center justify-between px-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <Checkbox 
               checked={emails.length > 0 && selectedEmailIds.size === emails.length}
               onCheckedChange={toggleSelectAll}
               aria-label="Select all"
               className="rounded-[4px]"
             />
-            <span className="text-sm text-muted-foreground font-medium">
-              {selectedEmailIds.size > 0 ? `${selectedEmailIds.size} selected` : 'Inbox'}
-            </span>
+            {selectedEmailIds.size > 0 ? (
+              <span className="text-sm text-foreground font-medium whitespace-nowrap">
+                {selectedEmailIds.size} selected
+              </span>
+            ) : activeLabel ? (
+              <div className="flex items-center gap-2 min-w-0">
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: activeLabel.color || '#888' }}
+                />
+                <span className="text-sm text-foreground font-semibold truncate">
+                  {activeLabel.name}
+                </span>
+                <button
+                  onClick={clearLabelFilter}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                  aria-label="Clear label filter and show all mail"
+                  title="Back to all mail"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">All mail</span>
+                </button>
+              </div>
+            ) : (
+              <span className="text-sm text-foreground font-semibold whitespace-nowrap">
+                {view === "all" ? "All mail" : VIEWS.find((v) => v.value === view)?.label ?? "Inbox"}
+              </span>
+            )}
           </div>
           
           {selectedEmailIds.size > 0 && (
@@ -214,19 +239,6 @@ export default function InboxPage() {
               </button>
             );
           })}
-          {activeLabel && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-muted text-foreground ml-1 shrink-0">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: activeLabel.color || '#888' }} />
-              {activeLabel.name}
-              <button
-                onClick={clearLabelFilter}
-                className="ml-0.5 text-muted-foreground hover:text-destructive"
-                aria-label="Clear label filter"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          )}
         </div>
       </div>
 
