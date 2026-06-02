@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Plus } from "lucide-react";
+import { ChevronLeft, Plus, Check } from "lucide-react";
 import { Label } from "@workspace/api-client-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -11,6 +11,28 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+
+/** A small curated palette offered when quick-creating a label inline. */
+export const LABEL_COLOR_PRESETS = [
+  "#ef4444",
+  "#f97316",
+  "#f59e0b",
+  "#eab308",
+  "#84cc16",
+  "#22c55e",
+  "#10b981",
+  "#14b8a6",
+  "#06b6d4",
+  "#3b82f6",
+  "#6366f1",
+  "#8b5cf6",
+  "#a855f7",
+  "#ec4899",
+  "#f43f5e",
+  "#64748b",
+] as const;
+
+const DEFAULT_LABEL_COLOR = "#6366f1";
 
 export interface LabelPickerSection {
   heading: string;
@@ -30,9 +52,10 @@ interface LabelPickerProps {
   searchPlaceholder?: string;
   /**
    * When set, typing a name that matches no existing label offers a
-   * "Create <name>" action that creates the Gmail label and applies it.
+   * "Create <name>" action. Choosing it reveals a small swatch palette so the
+   * user can pick a color before the Gmail label is created and applied.
    */
-  onCreate?: (name: string) => void | Promise<void>;
+  onCreate?: (name: string, color: string) => void | Promise<void>;
 }
 
 /**
@@ -49,10 +72,13 @@ export function LabelPicker({
 }: LabelPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // When set, the picker shows the swatch palette for naming `pendingName`.
+  const [pendingName, setPendingName] = useState<string | null>(null);
 
   const reset = () => {
     setOpen(false);
     setQuery("");
+    setPendingName(null);
   };
 
   const select = (labelId: string, onSelect: (id: string) => void) => {
@@ -60,9 +86,9 @@ export function LabelPicker({
     onSelect(labelId);
   };
 
-  const create = (name: string) => {
+  const create = (name: string, color: string) => {
     reset();
-    void onCreate?.(name);
+    void onCreate?.(name, color);
   };
 
   const hasAnyLabels = sections.some((s) => s.labels.length > 0);
@@ -79,6 +105,44 @@ export function LabelPicker({
     <Popover open={open} onOpenChange={(o) => (o ? setOpen(true) : reset())}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent align={align} className="w-60 p-0 rounded-xl shadow-lg">
+        {pendingName !== null ? (
+          <div className="p-3">
+            <div className="flex items-center gap-1.5 mb-3">
+              <button
+                type="button"
+                onClick={() => setPendingName(null)}
+                className="flex items-center justify-center h-6 w-6 -ml-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+                aria-label="Back to labels"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-xs text-muted-foreground truncate">
+                Color for “<span className="text-foreground font-medium">{pendingName}</span>”
+              </span>
+            </div>
+            <div className="grid grid-cols-8 gap-1.5">
+              {LABEL_COLOR_PRESETS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => create(pendingName, color)}
+                  className={cn(
+                    "h-6 w-6 rounded-full ring-offset-background transition-transform hover:scale-110",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    color === DEFAULT_LABEL_COLOR &&
+                      "ring-2 ring-ring ring-offset-2",
+                  )}
+                  style={{ backgroundColor: color }}
+                  aria-label={`Create label with color ${color}`}
+                >
+                  {color === DEFAULT_LABEL_COLOR && (
+                    <Check className="w-3.5 h-3.5 text-white mx-auto" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
         <Command>
           {(hasAnyLabels || onCreate) && (
             <CommandInput
@@ -124,7 +188,7 @@ export function LabelPicker({
                 <CommandItem
                   value={trimmed}
                   forceMount
-                  onSelect={() => create(trimmed)}
+                  onSelect={() => setPendingName(trimmed)}
                   className="rounded-lg cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5 mr-2 shrink-0" />
@@ -134,6 +198,7 @@ export function LabelPicker({
             )}
           </CommandList>
         </Command>
+        )}
       </PopoverContent>
     </Popover>
   );

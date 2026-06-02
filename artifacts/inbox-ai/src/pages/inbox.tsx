@@ -149,11 +149,11 @@ export default function InboxPage() {
     }
   };
 
-  const handleBulkCreateAndApply = async (name: string) => {
+  const handleBulkCreateAndApply = async (name: string, color: string) => {
     if (selectedEmailIds.size === 0) return;
     try {
       const newLabel = await createLabel.mutateAsync({
-        data: { name, color: "#6366f1" }
+        data: { name, color }
       });
       queryClient.invalidateQueries({ queryKey: getListLabelsQueryKey() });
       await handleBulkAction("add", newLabel.id);
@@ -457,10 +457,10 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
     );
   };
 
-  const handleCreateAndApply = async (name: string) => {
+  const handleCreateAndApply = async (name: string, color: string) => {
     try {
       const newLabel = await createLabel.mutateAsync({
-        data: { name, color: "#6366f1" }
+        data: { name, color }
       });
       queryClient.invalidateQueries({ queryKey: getListLabelsQueryKey() });
       await setLabels.mutateAsync({
