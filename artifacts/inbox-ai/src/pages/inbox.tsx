@@ -21,7 +21,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { 
   Star, Inbox as InboxIcon, Tags, Filter, 
-  CheckSquare, Sparkles, X, Loader2, Mail, ArrowLeft
+  CheckSquare, Sparkles, X, Loader2, Mail, ArrowLeft, MoreVertical
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
@@ -491,7 +491,8 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
           </Button>
         </div>
         
-        <div className="flex items-center gap-2">
+        {/* Secondary actions — full buttons on desktop */}
+        <div className="hidden sm:flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-2 h-8 rounded-lg border-border/60 shadow-none text-xs font-medium" onClick={requestSuggestions} disabled={suggestLabels.isPending}>
             {suggestLabels.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
             Suggest Labels
@@ -506,6 +507,39 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg">
               <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider">Available Labels</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {labels.filter(l => !email.labels.find(el => el.id === l.id)).map(l => (
+                <DropdownMenuItem 
+                  key={l.id} 
+                  className="rounded-lg"
+                  onClick={() => setLabels.mutate({ id: email.id, data: { labelIds: [...email.labels.map(el => el.id), l.id] } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetEmailQueryKey(email.id) }); queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() }); }})}
+                >
+                  <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: l.color || '#888' }} />
+                  {l.name}
+                </DropdownMenuItem>
+              ))}
+              {labels.filter(l => !email.labels.find(el => el.id === l.id)).length === 0 && (
+                <div className="py-2 px-2 text-xs text-muted-foreground text-center">No more labels</div>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Secondary actions — overflow menu on small phones */}
+        <div className="sm:hidden">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="More actions" className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg">
+              <DropdownMenuItem className="rounded-lg" onClick={requestSuggestions} disabled={suggestLabels.isPending}>
+                {suggestLabels.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-2" />}
+                Suggest Labels
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider">Add Label</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {labels.filter(l => !email.labels.find(el => el.id === l.id)).map(l => (
                 <DropdownMenuItem 
