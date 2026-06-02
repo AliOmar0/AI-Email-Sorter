@@ -29,7 +29,7 @@ function ThemeToggle() {
   );
 }
 
-export function Sidebar({ user }: { user: User }) {
+export function Sidebar({ user, onNavigate }: { user: User; onNavigate?: () => void }) {
   const [location, setLocation] = useLocation();
   const searchString = useSearch();
   const queryClient = useQueryClient();
@@ -88,7 +88,7 @@ export function Sidebar({ user }: { user: User }) {
   ];
 
   return (
-    <div className="w-64 border-r border-sidebar-border bg-sidebar h-screen flex flex-col text-sidebar-foreground shrink-0">
+    <div className="w-full md:w-64 border-r border-sidebar-border bg-sidebar h-full flex flex-col text-sidebar-foreground shrink-0">
       <div className="h-16 flex items-center justify-between px-6 shrink-0 mt-2">
         <div className="flex items-center gap-3 font-semibold text-lg tracking-tight text-sidebar-foreground">
           <div className="w-8 h-8 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center shadow-sm">
@@ -110,6 +110,7 @@ export function Sidebar({ user }: { user: User }) {
               if (e.key === "Enter") {
                 if (debounceRef.current) clearTimeout(debounceRef.current);
                 goToSearch(query);
+                onNavigate?.();
               }
             }}
             className="w-full pl-9 h-9 bg-sidebar-accent/40 border-sidebar-border text-sidebar-foreground placeholder:text-sidebar-foreground/50 shadow-none focus-visible:ring-1"
@@ -128,7 +129,7 @@ export function Sidebar({ user }: { user: User }) {
               item.href === "/inbox" ? matchesPath && !activeLabelId : matchesPath;
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href}>
+              <Link key={item.href} href={item.href} onClick={() => onNavigate?.()}>
                 <div
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all",
@@ -153,7 +154,7 @@ export function Sidebar({ user }: { user: User }) {
             {labels.map((label) => {
               const isActive = activeLabelId === label.id;
               return (
-                <Link key={label.id} href={`/inbox?labelId=${label.id}`}>
+                <Link key={label.id} href={`/inbox?labelId=${label.id}`} onClick={() => onNavigate?.()}>
                   <div
                     className={cn(
                       "flex items-center justify-between px-3 py-2 rounded-xl text-sm cursor-pointer transition-all group",

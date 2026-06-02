@@ -21,8 +21,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { 
   Star, Inbox as InboxIcon, Tags, Filter, 
-  CheckSquare, Sparkles, X, Loader2, Mail
+  CheckSquare, Sparkles, X, Loader2, Mail, ArrowLeft
 } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -47,6 +48,7 @@ export default function InboxPage() {
   // different label in the sidebar updates this page instead of being ignored.
   const searchString = useSearch();
   const [, navigate] = useLocation();
+  const isMobile = useIsMobile();
   const params = new URLSearchParams(searchString);
   const view = (params.get("view") as ListEmailsView) || "all";
   const labelIdFilter = params.get("labelId") || undefined;
@@ -333,27 +335,39 @@ export default function InboxPage() {
   return (
     <div className="h-full w-full bg-background">
       {activeEmailId ? (
-        <ResizablePanelGroup
-          direction="horizontal"
-          autoSaveId="inbox-reader"
-          className="h-full w-full"
-        >
-          <ResizablePanel defaultSize={42} minSize={28}>
-            {emailListPanel}
-          </ResizablePanel>
+        isMobile ? (
+          // On phones the reading pane takes over the full screen with a back
+          // button, instead of being squeezed into a narrow side-by-side split.
+          <div className="h-full flex flex-col bg-background relative z-0 min-w-0">
+            <EmailDetail
+              emailId={activeEmailId}
+              labels={labels}
+              onClose={() => setActiveEmailId(null)}
+            />
+          </div>
+        ) : (
+          <ResizablePanelGroup
+            direction="horizontal"
+            autoSaveId="inbox-reader"
+            className="h-full w-full"
+          >
+            <ResizablePanel defaultSize={42} minSize={28}>
+              {emailListPanel}
+            </ResizablePanel>
 
-          <ResizableHandle withHandle />
+            <ResizableHandle withHandle />
 
-          <ResizablePanel defaultSize={58} minSize={30}>
-            <div className="h-full flex flex-col bg-background relative z-0 min-w-0">
-              <EmailDetail 
-                emailId={activeEmailId} 
-                labels={labels}
-                onClose={() => setActiveEmailId(null)}
-              />
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+            <ResizablePanel defaultSize={58} minSize={30}>
+              <div className="h-full flex flex-col bg-background relative z-0 min-w-0">
+                <EmailDetail 
+                  emailId={activeEmailId} 
+                  labels={labels}
+                  onClose={() => setActiveEmailId(null)}
+                />
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )
       ) : (
         emailListPanel
       )}
@@ -455,8 +469,8 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
       {/* Header Actions */}
       <div className="h-14 border-b border-border/50 flex items-center justify-between px-4 shrink-0 bg-background/95 backdrop-blur z-10">
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={onClose} className="lg:hidden mr-2 text-muted-foreground hover:text-foreground">
-            <X className="w-4 h-4" />
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Back to inbox" className="md:hidden mr-1 text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="w-4 h-4" />
           </Button>
           <Button 
             variant="ghost" 
