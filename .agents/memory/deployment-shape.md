@@ -25,5 +25,6 @@ Inbox AI is a full-stack app: an Express API server (`api-server`, mounted `/api
 
 ## Gotchas
 
+- **Fresh cross-origin deploys have NO migration step — tables are created at runtime.** The backend creates both `session` and `users` via idempotent `CREATE TABLE IF NOT EXISTS` in `ensureTables()` (app.ts), called from both entry points (index.ts startup, vercel.ts per warm instance). On a brand-new Neon DB nothing runs `drizzle-kit push`, so without this the first OAuth callback fails with `relation "users" does not exist` (500). **Why:** `push` can't be relied on for the Vercel/Neon path (see next bullet). **How to apply:** if you add a column to the `users`/schema tables, also update the DDL in `ensureUsersTable` (it mirrors lib/db schema/users.ts), or fresh deploys will be missing it.
 - **`drizzle-kit push` wants to DROP the `session` table.** connect-pg-simple creates `session` at runtime; it's not in the Drizzle schema, so push flags it as data-loss and (non-interactively) errors out. For additive column changes, apply the `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` directly via SQL instead of running push.
 - Production import of `dist/vercel.mjs` only works with `NODE_ENV=production`; in dev it tries to spawn the pino-pretty worker that the Vercel build intentionally omits.

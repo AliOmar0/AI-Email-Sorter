@@ -1,4 +1,4 @@
-import app, { ensureSessionTable } from "./app";
+import app, { ensureTables } from "./app";
 import { logger } from "./lib/logger";
 
 const rawPort = process.env["PORT"];
@@ -16,7 +16,7 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 async function start(): Promise<void> {
-  await ensureSessionTable();
+  await ensureTables();
 
   app.listen(port, (err) => {
     if (err) {

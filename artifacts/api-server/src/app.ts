@@ -70,6 +70,35 @@ export async function ensureSessionTable(): Promise<void> {
   `);
 }
 
+// Idempotently create the `users` table. On Replit this is normally created via
+// `drizzle-kit push`, but on fresh cross-origin deploys (Vercel + Neon) no push
+// step runs, so we create it here with DDL that mirrors lib/db schema/users.ts.
+// Safe to run repeatedly (CREATE ... IF NOT EXISTS is a no-op when present).
+export async function ensureUsersTable(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "users" (
+      "id" serial PRIMARY KEY,
+      "google_id" text NOT NULL UNIQUE,
+      "email" text NOT NULL,
+      "name" text NOT NULL,
+      "picture" text,
+      "access_token" text,
+      "refresh_token" text,
+      "token_expiry" timestamp with time zone,
+      "token_version" integer NOT NULL DEFAULT 0,
+      "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+      "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+    );
+  `);
+}
+
+// Ensure all runtime-managed tables exist. Called once at startup (Replit) and
+// once per warm serverless instance (Vercel).
+export async function ensureTables(): Promise<void> {
+  await ensureSessionTable();
+  await ensureUsersTable();
+}
+
 const PgStore = connectPgSimple(session);
 app.use(
   session({
