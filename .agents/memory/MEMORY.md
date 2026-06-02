@@ -1,3 +1,4 @@
 - [Zod error handling](zod-error-handling.md) — Express error handler must import ZodError from "zod" (v3 root, matches Orval schemas), and unwrap drizzle-wrapped pg error codes via .cause.
 - [Gmail-backed architecture](gmail-backed-architecture.md) — Inbox AI quirks: SESSION_SECRET also encrypts tokens; bounded recent-window caps for list/stats/AI; OAuth state guard; gmail.modify verification limits.
 - [Deployment shape](deployment-shape.md) — Inbox AI ships two ways: Replit all-in-one, or cross-origin split (GH Pages + Vercel + Neon) via env-gated bearer-token auth. Covers token revocation + drizzle-push session-table gotcha.
+- [wouter URL-driven filters](wouter-url-filters.md) — derive page filters from useSearch() reactively, not useState(window.location.search) at mount, or sidebar nav silently stops updating the list.

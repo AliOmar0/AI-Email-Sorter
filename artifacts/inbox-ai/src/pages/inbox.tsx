@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import type { ImperativePanelHandle } from "react-resizable-panels";
+import { useState, useEffect } from "react";
+import { useSearch, useLocation } from "wouter";
 import { 
   useListEmails, 
   getListEmailsQueryKey, 
@@ -20,55 +20,54 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { 
-  Search, Star, Inbox as InboxIcon, Tags, Filter, 
-  CheckSquare, Sparkles, X, Loader2, Mail,
-  PanelLeftClose, PanelLeftOpen
+  Star, Inbox as InboxIcon, Tags, Filter, 
+  CheckSquare, Sparkles, X, Loader2, Mail
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { LabelBadge } from "@/components/labels/label-badge";
 import { EmailBody } from "@/components/inbox/email-body";
 import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
+const VIEWS: { value: ListEmailsView; label: string; icon: typeof InboxIcon }[] = [
+  { value: "all", label: "All", icon: InboxIcon },
+  { value: "unlabeled", label: "Unlabeled", icon: Filter },
+  { value: "starred", label: "Starred", icon: Star },
+  { value: "unread", label: "Unread", icon: CheckSquare },
+];
+
 export default function InboxPage() {
-  const searchParams = new URLSearchParams(window.location.search);
-  const viewParam = searchParams.get("view") as ListEmailsView | null;
-  const labelIdParam = searchParams.get("labelId");
-  
-  const [view, setView] = useState<ListEmailsView>(viewParam || "all");
-  const [labelIdFilter, setLabelIdFilter] = useState<string | undefined>(labelIdParam || undefined);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  
+  // Filters live in the URL so the sidebar (labels + search) and the view tabs
+  // below drive a single email list. Reading them reactively means clicking a
+  // different label in the sidebar updates this page instead of being ignored.
+  const searchString = useSearch();
+  const [, navigate] = useLocation();
+  const params = new URLSearchParams(searchString);
+  const view = (params.get("view") as ListEmailsView) || "all";
+  const labelIdFilter = params.get("labelId") || undefined;
+  const search = params.get("search") || "";
+
   const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set());
   const [activeEmailId, setActiveEmailId] = useState<string | null>(null);
 
-  const filterPanelRef = useRef<ImperativePanelHandle>(null);
-  const [filterCollapsed, setFilterCollapsed] = useState(false);
-
-  const toggleFilterPanel = () => {
-    const panel = filterPanelRef.current;
-    if (!panel) return;
-    if (panel.isCollapsed()) {
-      panel.expand();
-    } else {
-      panel.collapse();
-    }
-  };
+  // Whenever the active filter changes, close any open email and clear the
+  // current selection so they never point at a row that's no longer listed.
+  useEffect(() => {
+    setActiveEmailId(null);
+    setSelectedEmailIds(new Set());
+  }, [view, labelIdFilter, search]);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const { data: emails = [], isLoading: isLoadingEmails } = useListEmails(
-    { view, labelId: labelIdFilter, search: debouncedSearch },
-    { query: { queryKey: getListEmailsQueryKey({ view, labelId: labelIdFilter, search: debouncedSearch }) } }
+    { view, labelId: labelIdFilter, search },
+    { query: { queryKey: getListEmailsQueryKey({ view, labelId: labelIdFilter, search }) } }
   );
 
   const { data: labels = [] } = useListLabels({ query: { queryKey: getListLabelsQueryKey() } });
@@ -76,9 +75,26 @@ export default function InboxPage() {
   const updateEmail = useUpdateEmail();
   const bulkLabel = useBulkLabelEmails();
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value);
-    setTimeout(() => setDebouncedSearch(e.target.value), 300);
+  const activeLabel = labelIdFilter ? labels.find((l) => l.id === labelIdFilter) : undefined;
+
+  // Change one filter while preserving the rest of the query string (e.g. an
+  // active search), so filters compose instead of clobbering each other.
+  const navigateWithParams = (mutate: (p: URLSearchParams) => void) => {
+    const next = new URLSearchParams(searchString);
+    mutate(next);
+    const qs = next.toString();
+    navigate(qs ? `/inbox?${qs}` : "/inbox");
+  };
+
+  const selectView = (v: ListEmailsView) => {
+    navigateWithParams((p) => {
+      p.set("view", v);
+      p.delete("labelId");
+    });
+  };
+
+  const clearLabelFilter = () => {
+    navigateWithParams((p) => p.delete("labelId"));
   };
 
   const toggleSelectAll = () => {
@@ -130,106 +146,11 @@ export default function InboxPage() {
     }
   };
 
-  return (
-    <ResizablePanelGroup
-      direction="horizontal"
-      autoSaveId="inbox-panels"
-      className="h-full w-full bg-background"
-    >
-      {/* Left Panel - Views & Labels (resizable + collapsible) */}
-      <ResizablePanel
-        ref={filterPanelRef}
-        collapsible
-        collapsedSize={0}
-        minSize={14}
-        defaultSize={18}
-        maxSize={28}
-        onCollapse={() => setFilterCollapsed(true)}
-        onExpand={() => setFilterCollapsed(false)}
-        className="bg-muted/10"
-      >
-        <div className="h-full flex flex-col min-w-0">
-        <div className="p-4 border-b border-border/50">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search emails..." 
-              value={search}
-              onChange={handleSearch}
-              className="w-full pl-9 bg-background/50 border-border/60 shadow-none focus-visible:ring-1"
-            />
-          </div>
-        </div>
-        <ScrollArea className="flex-1">
-          <div className="p-3 space-y-1 text-sm">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2 mt-1">Views</div>
-            {(["all", "unlabeled", "starred", "unread"] as ListEmailsView[]).map((v) => (
-              <button
-                key={v}
-                onClick={() => { setView(v); setLabelIdFilter(undefined); setActiveEmailId(null); }}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
-                  view === v && !labelIdFilter ? "bg-muted font-medium text-foreground" : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {v === "all" && <InboxIcon className="w-4 h-4" />}
-                {v === "unlabeled" && <Filter className="w-4 h-4" />}
-                {v === "starred" && <Star className="w-4 h-4" />}
-                {v === "unread" && <CheckSquare className="w-4 h-4" />}
-                <span className="capitalize">{v}</span>
-              </button>
-            ))}
-
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 pt-6 pb-2">Labels</div>
-            {labels.map((label) => (
-              <button
-                key={label.id}
-                onClick={() => { setLabelIdFilter(label.id); setView("all"); setActiveEmailId(null); }}
-                className={cn(
-                  "w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors group",
-                  labelIdFilter === label.id ? "bg-muted font-medium text-foreground" : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <div className="flex items-center gap-3 truncate">
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: label.color || '#888' }} />
-                  <span className="truncate">{label.name}</span>
-                </div>
-                {label.emailCount > 0 && (
-                  <span className={cn(
-                    "text-[10px] px-1.5 py-0.5 rounded-full tabular-nums",
-                    labelIdFilter === label.id ? "bg-background shadow-sm" : "bg-muted group-hover:bg-background"
-                  )}>
-                    {label.emailCount}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </ScrollArea>
-        </div>
-      </ResizablePanel>
-
-      <ResizableHandle withHandle />
-
-      {/* Middle Panel - Email List (resizable) */}
-      <ResizablePanel defaultSize={34} minSize={24}>
-        <div className="h-full flex flex-col min-w-0">
-        <div className="h-14 border-b border-border/50 flex items-center justify-between px-4 bg-background z-10 shrink-0">
+  const emailListPanel = (
+    <div className="h-full flex flex-col min-w-0">
+      <div className="border-b border-border/50 bg-background z-10 shrink-0">
+        <div className="h-14 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleFilterPanel}
-                  className="h-8 w-8 -ml-1 text-muted-foreground hover:text-foreground"
-                  aria-label={filterCollapsed ? "Show filters" : "Hide filters"}
-                >
-                  {filterCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">{filterCollapsed ? "Show filters" : "Hide filters"}</TooltipContent>
-            </Tooltip>
             <Checkbox 
               checked={emails.length > 0 && selectedEmailIds.size === emails.length}
               onCheckedChange={toggleSelectAll}
@@ -274,7 +195,42 @@ export default function InboxPage() {
           )}
         </div>
 
-        <ScrollArea className="flex-1 bg-background">
+        {/* View filter tabs (moved out of the old duplicate side panel) */}
+        <div className="flex items-center gap-1 px-3 pb-2 overflow-x-auto">
+          {VIEWS.map((v) => {
+            const Icon = v.icon;
+            const isActive = view === v.value && !labelIdFilter;
+            return (
+              <button
+                key={v.value}
+                onClick={() => selectView(v.value)}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
+                  isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                )}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {v.label}
+              </button>
+            );
+          })}
+          {activeLabel && (
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-muted text-foreground ml-1 shrink-0">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: activeLabel.color || '#888' }} />
+              {activeLabel.name}
+              <button
+                onClick={clearLabelFilter}
+                className="ml-0.5 text-muted-foreground hover:text-destructive"
+                aria-label="Clear label filter"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+        </div>
+      </div>
+
+      <ScrollArea className="flex-1 bg-background">
           {isLoadingEmails ? (
             <div className="divide-y divide-border/30">
               {[...Array(8)].map((_, i) => (
@@ -357,31 +313,39 @@ export default function InboxPage() {
             </div>
           )}
         </ScrollArea>
-        </div>
-      </ResizablePanel>
+    </div>
+  );
 
-      <ResizableHandle withHandle />
+  // Two panels: the email list (driven by the sidebar + view tabs) and, only
+  // once an email is opened, a reading pane beside it.
+  return (
+    <div className="h-full w-full bg-background">
+      {activeEmailId ? (
+        <ResizablePanelGroup
+          direction="horizontal"
+          autoSaveId="inbox-reader"
+          className="h-full w-full"
+        >
+          <ResizablePanel defaultSize={42} minSize={28}>
+            {emailListPanel}
+          </ResizablePanel>
 
-      {/* Right Panel - Reading Pane (resizable) */}
-      <ResizablePanel defaultSize={48} minSize={30}>
-        <div className="h-full flex flex-col bg-background relative z-0 min-w-0">
-        {activeEmailId ? (
-          <EmailDetail 
-            emailId={activeEmailId} 
-            labels={labels}
-            onClose={() => setActiveEmailId(null)}
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/5">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-muted/50 mb-4">
-              <InboxIcon className="w-8 h-8 opacity-20" />
+          <ResizableHandle withHandle />
+
+          <ResizablePanel defaultSize={58} minSize={30}>
+            <div className="h-full flex flex-col bg-background relative z-0 min-w-0">
+              <EmailDetail 
+                emailId={activeEmailId} 
+                labels={labels}
+                onClose={() => setActiveEmailId(null)}
+              />
             </div>
-            <p className="text-sm">Select an email to read</p>
-          </div>
-        )}
-        </div>
-      </ResizablePanel>
-    </ResizablePanelGroup>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      ) : (
+        emailListPanel
+      )}
+    </div>
   );
 }
 

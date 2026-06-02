@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
-import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Inbox, Tags, Sparkles, LogOut, Moon, Sun } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useSearch } from "wouter";
+import { LayoutDashboard, Inbox, Tags, Sparkles, LogOut, Moon, Sun, Search } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { useListLabels, getListLabelsQueryKey, User, useLogout } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 import { clearAuthToken } from "@/lib/api-base";
 
 function ThemeToggle() {
@@ -30,9 +31,40 @@ function ThemeToggle() {
 
 export function Sidebar({ user }: { user: User }) {
   const [location, setLocation] = useLocation();
+  const searchString = useSearch();
   const queryClient = useQueryClient();
   const { data: labels = [] } = useListLabels({ query: { queryKey: getListLabelsQueryKey() } });
-  
+
+  // Search lives in the main sidebar and drives the inbox via the URL.
+  const [query, setQuery] = useState(() => new URLSearchParams(searchString).get("search") || "");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    setQuery(new URLSearchParams(searchString).get("search") || "");
+  }, [searchString]);
+
+  // Clear any pending debounce on unmount so a late timer can't navigate.
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
+
+  const goToSearch = (value: string) => {
+    // Preserve any other active filters (e.g. a selected label) when searching.
+    const next = new URLSearchParams(searchString);
+    const trimmed = value.trim();
+    if (trimmed) next.set("search", trimmed);
+    else next.delete("search");
+    const qs = next.toString();
+    setLocation(qs ? `/inbox?${qs}` : "/inbox");
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => goToSearch(value), 300);
+  };
+
   const logout = useLogout();
 
   const handleLogout = () => {
@@ -63,6 +95,24 @@ export function Sidebar({ user }: { user: User }) {
           <span>Inbox AI</span>
         </div>
         <ThemeToggle />
+      </div>
+
+      <div className="px-4 pt-1 pb-2 shrink-0">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-sidebar-foreground/50" />
+          <Input
+            placeholder="Search emails..."
+            value={query}
+            onChange={handleSearchChange}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                if (debounceRef.current) clearTimeout(debounceRef.current);
+                goToSearch(query);
+              }
+            }}
+            className="w-full pl-9 h-9 bg-sidebar-accent/40 border-sidebar-border text-sidebar-foreground placeholder:text-sidebar-foreground/50 shadow-none focus-visible:ring-1"
+          />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto py-6 flex flex-col gap-8">
