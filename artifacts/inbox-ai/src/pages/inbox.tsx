@@ -21,7 +21,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { 
   Star, Inbox as InboxIcon, Tags, Filter, 
-  CheckSquare, Sparkles, X, Loader2, Mail, ArrowLeft, MoreVertical
+  CheckSquare, Sparkles, X, Loader2, Mail, ArrowLeft
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { LabelBadge } from "@/components/labels/label-badge";
 import { EmailBody } from "@/components/inbox/email-body";
 import { useToast } from "@/hooks/use-toast";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { LabelPicker } from "@/components/labels/label-picker";
 
 const VIEWS: { value: ListEmailsView; label: string; icon: typeof InboxIcon }[] = [
   { value: "all", label: "All", icon: InboxIcon },
@@ -191,33 +191,28 @@ export default function InboxPage() {
           
           {selectedEmailIds.size > 0 && (
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 animate-in fade-in zoom-in-95 duration-200">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+              <LabelPicker
+                align="end"
+                trigger={
                   <Button variant="outline" size="sm" className="h-9 sm:h-8 gap-2 px-3 border-border/60 shadow-none">
                     <Tags className="w-3.5 h-3.5" />
                     Label
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg">
-                  <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider">Apply Label</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {labels.map(l => (
-                    <DropdownMenuItem key={l.id} onClick={() => handleBulkAction("add", l.id)} className="rounded-lg">
-                      <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: l.color || '#888' }} />
-                      {l.name}
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider">Remove Label</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {labels.map(l => (
-                    <DropdownMenuItem key={l.id} onClick={() => handleBulkAction("remove", l.id)} className="rounded-lg text-destructive focus:text-destructive">
-                      <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: l.color || '#888' }} />
-                      {l.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                }
+                sections={[
+                  {
+                    heading: "Apply Label",
+                    labels,
+                    onSelect: (id) => handleBulkAction("add", id),
+                  },
+                  {
+                    heading: "Remove Label",
+                    labels,
+                    onSelect: (id) => handleBulkAction("remove", id),
+                    itemClassName: "text-destructive data-[selected=true]:text-destructive",
+                  },
+                ]}
+              />
               <Button
                 variant="ghost"
                 size="icon"
@@ -431,6 +426,18 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
     } catch (e) {}
   };
 
+  const addLabelToEmail = (labelId: string) => {
+    setLabels.mutate(
+      { id: email.id, data: { labelIds: [...email.labels.map(el => el.id), labelId] } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetEmailQueryKey(email.id) });
+          queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() });
+        },
+      }
+    );
+  };
+
   const handleApplySuggestion = async (suggestion: any) => {
     try {
       let targetLabelId = suggestion.labelId;
@@ -508,64 +515,54 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
             Suggest Labels
           </Button>
           
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <LabelPicker
+            align="end"
+            trigger={
               <Button variant="outline" size="sm" className="gap-2 h-8 rounded-lg border-border/60 shadow-none text-xs font-medium">
                 <Tags className="w-3.5 h-3.5" />
                 Add Label
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg">
-              <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider">Available Labels</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {labels.filter(l => !email.labels.find(el => el.id === l.id)).map(l => (
-                <DropdownMenuItem 
-                  key={l.id} 
-                  className="rounded-lg"
-                  onClick={() => setLabels.mutate({ id: email.id, data: { labelIds: [...email.labels.map(el => el.id), l.id] } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetEmailQueryKey(email.id) }); queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() }); }})}
-                >
-                  <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: l.color || '#888' }} />
-                  {l.name}
-                </DropdownMenuItem>
-              ))}
-              {labels.filter(l => !email.labels.find(el => el.id === l.id)).length === 0 && (
-                <div className="py-2 px-2 text-xs text-muted-foreground text-center">No more labels</div>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+            sections={[
+              {
+                heading: "Available Labels",
+                labels: labels.filter(l => !email.labels.find(el => el.id === l.id)),
+                onSelect: (id) => addLabelToEmail(id),
+                emptyText: "No more labels",
+              },
+            ]}
+          />
         </div>
 
-        {/* Secondary actions — overflow menu on small phones */}
-        <div className="sm:hidden">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="More actions" className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full">
-                <MoreVertical className="w-4 h-4" />
+        {/* Secondary actions — icon buttons on small phones */}
+        <div className="sm:hidden flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Suggest labels"
+            title="Suggest Labels"
+            onClick={requestSuggestions}
+            disabled={suggestLabels.isPending}
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full"
+          >
+            {suggestLabels.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          </Button>
+          <LabelPicker
+            align="end"
+            trigger={
+              <Button variant="ghost" size="icon" aria-label="Add label" title="Add Label" className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full">
+                <Tags className="w-4 h-4" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg">
-              <DropdownMenuItem className="rounded-lg" onClick={requestSuggestions} disabled={suggestLabels.isPending}>
-                {suggestLabels.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-2" />}
-                Suggest Labels
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider">Add Label</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {labels.filter(l => !email.labels.find(el => el.id === l.id)).map(l => (
-                <DropdownMenuItem 
-                  key={l.id} 
-                  className="rounded-lg"
-                  onClick={() => setLabels.mutate({ id: email.id, data: { labelIds: [...email.labels.map(el => el.id), l.id] } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetEmailQueryKey(email.id) }); queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() }); }})}
-                >
-                  <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: l.color || '#888' }} />
-                  {l.name}
-                </DropdownMenuItem>
-              ))}
-              {labels.filter(l => !email.labels.find(el => el.id === l.id)).length === 0 && (
-                <div className="py-2 px-2 text-xs text-muted-foreground text-center">No more labels</div>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+            sections={[
+              {
+                heading: "Add Label",
+                labels: labels.filter(l => !email.labels.find(el => el.id === l.id)),
+                onSelect: (id) => addLabelToEmail(id),
+                emptyText: "No more labels",
+              },
+            ]}
+          />
         </div>
       </div>
 
