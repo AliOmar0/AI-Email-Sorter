@@ -24,6 +24,7 @@ import type {
   AutoLabelResult,
   BulkActionInput,
   BulkLabelInput,
+  ConnectedAccount,
   DigestInput,
   DigestResult,
   Email,
@@ -42,6 +43,7 @@ import type {
   SendEmailInput,
   SendEmailResult,
   Stats,
+  SwitchAccountInput,
   UnsubscribeResult,
   UpdateSettingsInput,
   User
@@ -1672,5 +1674,223 @@ export const useUpdateSettings = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateSettingsMutationOptions(options));
+    }
+
+export const getListAccountsUrl = () => {
+
+
+
+
+  return `/api/accounts`
+}
+
+/**
+ * @summary List the user's connected Gmail accounts
+ */
+export const listAccounts = async ( options?: RequestInit): Promise<ConnectedAccount[]> => {
+
+  return customFetch<ConnectedAccount[]>(getListAccountsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAccountsQueryKey = () => {
+    return [
+    `/api/accounts`
+    ] as const;
+    }
+
+
+export const getListAccountsQueryOptions = <TData = Awaited<ReturnType<typeof listAccounts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAccounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAccountsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAccounts>>> = ({ signal }) => listAccounts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAccounts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAccountsQueryResult = NonNullable<Awaited<ReturnType<typeof listAccounts>>>
+export type ListAccountsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the user's connected Gmail accounts
+ */
+
+export function useListAccounts<TData = Awaited<ReturnType<typeof listAccounts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAccounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAccountsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSwitchAccountUrl = () => {
+
+
+
+
+  return `/api/accounts/switch`
+}
+
+/**
+ * @summary Switch the active connected account
+ */
+export const switchAccount = async (switchAccountInput: SwitchAccountInput, options?: RequestInit): Promise<ConnectedAccount[]> => {
+
+  return customFetch<ConnectedAccount[]>(getSwitchAccountUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      switchAccountInput,)
+  }
+);}
+
+
+
+
+export const getSwitchAccountMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof switchAccount>>, TError,{data: BodyType<SwitchAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof switchAccount>>, TError,{data: BodyType<SwitchAccountInput>}, TContext> => {
+
+const mutationKey = ['switchAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof switchAccount>>, {data: BodyType<SwitchAccountInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  switchAccount(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SwitchAccountMutationResult = NonNullable<Awaited<ReturnType<typeof switchAccount>>>
+    export type SwitchAccountMutationBody = BodyType<SwitchAccountInput>
+    export type SwitchAccountMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Switch the active connected account
+ */
+export const useSwitchAccount = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof switchAccount>>, TError,{data: BodyType<SwitchAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof switchAccount>>,
+        TError,
+        {data: BodyType<SwitchAccountInput>},
+        TContext
+      > => {
+      return useMutation(getSwitchAccountMutationOptions(options));
+    }
+
+export const getUnlinkAccountUrl = (id: number,) => {
+
+
+
+
+  return `/api/accounts/${id}`
+}
+
+/**
+ * @summary Unlink a connected account
+ */
+export const unlinkAccount = async (id: number, options?: RequestInit): Promise<ConnectedAccount[]> => {
+
+  return customFetch<ConnectedAccount[]>(getUnlinkAccountUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getUnlinkAccountMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unlinkAccount>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unlinkAccount>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['unlinkAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unlinkAccount>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  unlinkAccount(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnlinkAccountMutationResult = NonNullable<Awaited<ReturnType<typeof unlinkAccount>>>
+
+    export type UnlinkAccountMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Unlink a connected account
+ */
+export const useUnlinkAccount = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unlinkAccount>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unlinkAccount>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getUnlinkAccountMutationOptions(options));
     }
 

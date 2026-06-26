@@ -7,6 +7,7 @@ import labelsRouter from "./labels";
 import aiRouter from "./ai";
 import statsRouter from "./stats";
 import settingsRouter from "./settings";
+import accountsRouter from "./accounts";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
@@ -25,5 +26,6 @@ router.use(labelsRouter);
 router.use(aiRouter);
 router.use(statsRouter);
 router.use(settingsRouter);
+router.use(accountsRouter);
 
 export default router;

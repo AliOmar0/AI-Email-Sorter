@@ -100,11 +100,42 @@ export async function ensureUsersTable(): Promise<void> {
   `);
 }
 
+// A connected Gmail account lives in `accounts` (multi-account). Create the
+// table and backfill a primary account for every existing user so the app keeps
+// working after the migration. Idempotent.
+export async function ensureAccountsTable(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "accounts" (
+      "id" serial PRIMARY KEY,
+      "user_id" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "google_id" text NOT NULL UNIQUE,
+      "email" text NOT NULL,
+      "name" text NOT NULL,
+      "picture" text,
+      "access_token" text,
+      "refresh_token" text,
+      "token_expiry" timestamp with time zone,
+      "is_primary" boolean NOT NULL DEFAULT false,
+      "auto_label_cursor" timestamp with time zone,
+      "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+      "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+    );
+    INSERT INTO "accounts"
+      ("user_id","google_id","email","name","picture","access_token","refresh_token","token_expiry","is_primary","auto_label_cursor")
+    SELECT u."id", u."google_id", u."email", u."name", u."picture",
+           u."access_token", u."refresh_token", u."token_expiry", true, u."auto_label_cursor"
+    FROM "users" u
+    WHERE NOT EXISTS (SELECT 1 FROM "accounts" a WHERE a."google_id" = u."google_id")
+    ON CONFLICT ("google_id") DO NOTHING;
+  `);
+}
+
 // Ensure all runtime-managed tables exist. Called once at startup (Replit) and
 // once per warm serverless instance (Vercel).
 export async function ensureTables(): Promise<void> {
   await ensureSessionTable();
   await ensureUsersTable();
+  await ensureAccountsTable();
 }
 
 const PgStore = connectPgSimple(session);

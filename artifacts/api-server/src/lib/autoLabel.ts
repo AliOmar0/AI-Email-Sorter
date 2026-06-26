@@ -1,43 +1,43 @@
-import { db, usersTable, type User } from "@workspace/db";
+import { db, usersTable, accountsTable, type Account } from "@workspace/db";
 import { and, eq, isNotNull } from "drizzle-orm";
-import { clientForUser } from "./google";
+import { clientForAccount } from "./google";
 import { listEmails, listLabels } from "./gmail";
 import { applyAutoLabels, userLabels } from "./aiLabeling";
 import { buildSinceQuery, newestReceivedAt } from "./autoLabelHelpers";
 import { logger } from "./logger";
 
 export interface AutoLabelRunResult {
-  userId: number;
+  accountId: number;
   considered: number;
   labeled: number;
 }
 
-// How many recent unlabeled emails to consider per user per run. Bounded
+// How many recent unlabeled emails to consider per account per run. Bounded
 // because each is a separate (slow, paid) AI call.
-const MAX_PER_USER = 15;
+const MAX_PER_ACCOUNT = 15;
 
-// Run one auto-label pass for a single user: classify recent unlabeled mail and
-// apply matching labels, then advance the watermark so the next run starts after
-// the newest message seen here.
-export async function runAutoLabelForUser(
-  user: User,
+// Run one auto-label pass for a single connected account: classify recent
+// unlabeled mail and apply matching labels, then advance the per-account
+// watermark so the next run starts after the newest message seen here.
+export async function runAutoLabelForAccount(
+  account: Account,
   budgetMs = 18_000,
 ): Promise<AutoLabelRunResult> {
-  const auth = clientForUser(user);
+  const auth = clientForAccount(account);
   const labels = userLabels(await listLabels(auth));
   if (labels.length === 0) {
-    return { userId: user.id, considered: 0, labeled: 0 };
+    return { accountId: account.id, considered: 0, labeled: 0 };
   }
 
-  const since = buildSinceQuery(user.autoLabelCursor ?? null);
+  const since = buildSinceQuery(account.autoLabelCursor ?? null);
   const targets = await listEmails(
     auth,
     { view: "unlabeled", search: since },
-    MAX_PER_USER,
+    MAX_PER_ACCOUNT,
   );
 
   if (targets.length === 0) {
-    return { userId: user.id, considered: 0, labeled: 0 };
+    return { accountId: account.id, considered: 0, labeled: 0 };
   }
 
   const outcome = await applyAutoLabels(auth, targets, labels, {
@@ -50,47 +50,56 @@ export async function runAutoLabelForUser(
   const newest = newestReceivedAt(targets);
   if (newest) {
     await db
-      .update(usersTable)
+      .update(accountsTable)
       .set({ autoLabelCursor: newest, updatedAt: new Date() })
-      .where(eq(usersTable.id, user.id));
+      .where(eq(accountsTable.id, account.id));
   }
 
-  return { userId: user.id, considered: targets.length, labeled: outcome.labeled };
+  return {
+    accountId: account.id,
+    considered: targets.length,
+    labeled: outcome.labeled,
+  };
 }
 
-// Run auto-labeling for every opted-in user that still has a refresh token,
-// bounded by a max user count and an overall wall-clock budget so the scheduled
-// invocation stays within the serverless function limit.
-export async function runAutoLabelForAllUsers(
-  opts: { maxUsers?: number; totalBudgetMs?: number } = {},
-): Promise<{ users: number; results: AutoLabelRunResult[] }> {
-  const maxUsers = opts.maxUsers ?? 25;
+// Run auto-labeling for every connected account whose owning user opted in and
+// that still has a refresh token. Bounded by a max account count and an overall
+// wall-clock budget so the scheduled invocation stays within the function limit.
+export async function runAutoLabelForAllAccounts(
+  opts: { maxAccounts?: number; totalBudgetMs?: number } = {},
+): Promise<{ accounts: number; results: AutoLabelRunResult[] }> {
+  const maxAccounts = opts.maxAccounts ?? 25;
   const totalBudgetMs = opts.totalBudgetMs ?? 50_000;
 
-  const candidates = await db
-    .select()
-    .from(usersTable)
+  const rows = await db
+    .select({ account: accountsTable })
+    .from(accountsTable)
+    .innerJoin(usersTable, eq(accountsTable.userId, usersTable.id))
     .where(
       and(
         eq(usersTable.autoLabelEnabled, true),
-        isNotNull(usersTable.refreshToken),
+        isNotNull(accountsTable.refreshToken),
       ),
     )
-    .limit(maxUsers);
+    .limit(maxAccounts);
 
+  const candidates = rows.map((r) => r.account);
   const results: AutoLabelRunResult[] = [];
   const startedAt = Date.now();
-  for (const user of candidates) {
+  for (const account of candidates) {
     if (Date.now() - startedAt > totalBudgetMs) break;
     const remaining = totalBudgetMs - (Date.now() - startedAt);
     try {
       results.push(
-        await runAutoLabelForUser(user, Math.min(18_000, Math.max(4_000, remaining))),
+        await runAutoLabelForAccount(
+          account,
+          Math.min(18_000, Math.max(4_000, remaining)),
+        ),
       );
     } catch (err) {
-      logger.error({ err, userId: user.id }, "auto-label run failed for user");
+      logger.error({ err, accountId: account.id }, "auto-label run failed");
     }
   }
 
-  return { users: candidates.length, results };
+  return { accounts: candidates.length, results };
 }

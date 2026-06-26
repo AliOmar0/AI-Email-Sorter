@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { CreateLabelBody, UpdateLabelBody } from "@workspace/api-zod";
-import { clientForUser } from "../lib/google";
+import { clientForAccount } from "../lib/google";
 import {
   listLabels,
   createLabel,
@@ -12,12 +12,12 @@ import {
 const router: IRouter = Router();
 
 router.get("/labels", async (req, res) => {
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   res.json(await listLabels(auth));
 });
 
 router.post("/labels", async (req, res) => {
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const body = CreateLabelBody.parse(req.body);
   const label = await createLabel(auth, {
     name: body.name,
@@ -27,7 +27,7 @@ router.post("/labels", async (req, res) => {
 });
 
 router.patch("/labels/:id", async (req, res) => {
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const body = UpdateLabelBody.parse(req.body);
   const label = await updateLabel(auth, req.params.id, {
     name: body.name,
@@ -37,7 +37,7 @@ router.patch("/labels/:id", async (req, res) => {
 });
 
 router.delete("/labels/:id", async (req, res) => {
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const label = await getLabelById(auth, req.params.id);
   if (!label) {
     res.status(404).json({ error: "Label not found" });

@@ -6,7 +6,7 @@ import {
   BulkEmailActionBody,
   SendEmailBody,
 } from "@workspace/api-zod";
-import { clientForUser } from "../lib/google";
+import { clientForAccount } from "../lib/google";
 import {
   listEmailsPaged,
   getEmail,
@@ -22,7 +22,7 @@ import {
 const router: IRouter = Router();
 
 router.get("/emails", async (req, res) => {
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const labelId =
     typeof req.query["labelId"] === "string" ? req.query["labelId"] : undefined;
   const view =
@@ -43,21 +43,21 @@ router.get("/emails", async (req, res) => {
 // bulk-* and send must be registered before "/emails/:id" so they aren't
 // captured as an id.
 router.post("/emails/bulk-label", async (req, res) => {
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const body = BulkLabelEmailsBody.parse(req.body);
   const emails = await bulkLabel(auth, body.emailIds, body.labelId, body.action);
   res.json(emails);
 });
 
 router.post("/emails/bulk-action", async (req, res) => {
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const body = BulkEmailActionBody.parse(req.body);
   const emails = await bulkAction(auth, body.emailIds, body.action);
   res.json(emails);
 });
 
 router.post("/emails/send", async (req, res) => {
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const body = SendEmailBody.parse(req.body);
   const result = await sendEmail(auth, {
     to: body.to,
@@ -70,19 +70,19 @@ router.post("/emails/send", async (req, res) => {
 });
 
 router.get("/emails/:id", async (req, res) => {
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const email = await getEmail(auth, req.params.id);
   res.json(email);
 });
 
 router.post("/emails/:id/unsubscribe", async (req, res) => {
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const result = await unsubscribeEmail(auth, req.params.id);
   res.json(result);
 });
 
 router.patch("/emails/:id", async (req, res) => {
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const body = UpdateEmailBody.parse(req.body);
   const email = await updateEmailState(auth, req.params.id, {
     isRead: body.isRead,
@@ -92,14 +92,14 @@ router.patch("/emails/:id", async (req, res) => {
 });
 
 router.put("/emails/:id/labels", async (req, res) => {
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const body = SetEmailLabelsBody.parse(req.body);
   const email = await setEmailLabels(auth, req.params.id, body.labelIds);
   res.json(email);
 });
 
 router.delete("/emails/:id/labels/:labelId", async (req, res) => {
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const email = await removeEmailLabel(
     auth,
     req.params.id,

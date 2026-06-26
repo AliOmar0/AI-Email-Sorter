@@ -481,3 +481,53 @@ export const UpdateSettingsResponse = zod.object({
 })
 
 
+/**
+ * @summary List the user's connected Gmail accounts
+ */
+export const ListAccountsResponseItem = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "picture": zod.string().nullable(),
+  "isPrimary": zod.boolean(),
+  "isActive": zod.boolean()
+})
+export const ListAccountsResponse = zod.array(ListAccountsResponseItem)
+
+
+/**
+ * @summary Switch the active connected account
+ */
+export const SwitchAccountBody = zod.object({
+  "accountId": zod.number()
+})
+
+export const SwitchAccountResponseItem = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "picture": zod.string().nullable(),
+  "isPrimary": zod.boolean(),
+  "isActive": zod.boolean()
+})
+export const SwitchAccountResponse = zod.array(SwitchAccountResponseItem)
+
+
+/**
+ * @summary Unlink a connected account
+ */
+export const UnlinkAccountParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UnlinkAccountResponseItem = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "picture": zod.string().nullable(),
+  "isPrimary": zod.boolean(),
+  "isActive": zod.boolean()
+})
+export const UnlinkAccountResponse = zod.array(UnlinkAccountResponseItem)
+
+

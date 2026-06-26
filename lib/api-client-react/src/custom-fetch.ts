@@ -17,6 +17,7 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _accountIdGetter: (() => string | number | null) | null = null;
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -42,6 +43,18 @@ export function setBaseUrl(url: string | null): void {
  */
 export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
+}
+
+/**
+ * Register a getter that supplies the active connected-account id. When it
+ * returns a non-null value, an `X-Account-Id` header is attached to every
+ * request so the backend targets the right Gmail mailbox (multi-account). This
+ * works in both cookie and bearer-token modes. Pass `null` to clear it.
+ */
+export function setAccountIdGetter(
+  getter: (() => string | number | null) | null,
+): void {
+  _accountIdGetter = getter;
 }
 
 function isRequest(input: RequestInfo | URL): input is Request {
@@ -355,6 +368,14 @@ export async function customFetch<T = unknown>(
     const token = await _authTokenGetter();
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
+    }
+  }
+
+  // Attach the active connected-account id (multi-account) when configured.
+  if (_accountIdGetter && !headers.has("x-account-id")) {
+    const accountId = _accountIdGetter();
+    if (accountId !== null && accountId !== undefined && accountId !== "") {
+      headers.set("x-account-id", String(accountId));
     }
   }
 

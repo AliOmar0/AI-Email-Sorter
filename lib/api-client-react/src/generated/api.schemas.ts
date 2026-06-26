@@ -27,6 +27,20 @@ export interface UpdateSettingsInput {
   autoLabelEnabled?: boolean;
 }
 
+export interface ConnectedAccount {
+  id: number;
+  email: string;
+  name: string;
+  /** @nullable */
+  picture: string | null;
+  isPrimary: boolean;
+  isActive: boolean;
+}
+
+export interface SwitchAccountInput {
+  accountId: number;
+}
+
 export interface Label {
   id: string;
   name: string;

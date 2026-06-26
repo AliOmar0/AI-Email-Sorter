@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { isAIConfigured } from "../lib/aiClient";
-import { runAutoLabelForAllUsers } from "../lib/autoLabel";
+import { runAutoLabelForAllAccounts } from "../lib/autoLabel";
 import { extractCronSecret, secretMatches } from "../lib/cronAuth";
 
 const router: IRouter = Router();
@@ -29,11 +29,11 @@ async function handleAutoLabelCron(
     return;
   }
 
-  const summary = await runAutoLabelForAllUsers();
+  const summary = await runAutoLabelForAllAccounts();
   const labeled = summary.results.reduce((n, r) => n + r.labeled, 0);
-  req.log.info({ users: summary.users, labeled }, "cron auto-label complete");
+  req.log.info({ accounts: summary.accounts, labeled }, "cron auto-label complete");
   res.json({
-    users: summary.users,
+    accounts: summary.accounts,
     labeled,
     results: summary.results,
   });

@@ -5,7 +5,7 @@ import {
   DigestEmailsBody,
 } from "@workspace/api-zod";
 import { getAIClient, isAIConfigured, AI_MODEL } from "../lib/aiClient";
-import { clientForUser } from "../lib/google";
+import { clientForAccount } from "../lib/google";
 import {
   listEmails,
   getEmail,
@@ -46,7 +46,7 @@ router.post("/ai/suggest-labels/:id", async (req, res) => {
   if (!isAIConfigured())
     return res.status(503).json({ error: "AI provider not configured" });
 
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const email = await getEmail(auth, req.params.id);
   const labels = userLabels(await listLabels(auth));
 
@@ -105,7 +105,7 @@ router.post("/ai/auto-label", async (req, res) => {
   if (!isAIConfigured())
     return res.status(503).json({ error: "AI provider not configured" });
 
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const body = AutoLabelEmailsBody.parse(req.body);
   const labels = userLabels(await listLabels(auth));
   if (labels.length === 0)
@@ -136,7 +136,7 @@ router.post("/ai/group-suggestions", async (req, res) => {
   if (!isAIConfigured())
     return res.status(503).json({ error: "AI provider not configured" });
 
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const body = SuggestEmailGroupsBody.parse(req.body);
 
   // Bounded working set: grouping reasons over a recent unlabeled window.
@@ -200,7 +200,7 @@ router.post("/ai/digest", async (req, res) => {
   if (!isAIConfigured())
     return res.status(503).json({ error: "AI provider not configured" });
 
-  const auth = clientForUser(req.user!);
+  const auth = clientForAccount(req.account!);
   const body = DigestEmailsBody.parse(req.body);
 
   // Scope the digest to the requested view/label, optionally unread-only.

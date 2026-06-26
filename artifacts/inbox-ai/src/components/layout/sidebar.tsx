@@ -7,7 +7,8 @@ import { useListLabels, getListLabelsQueryKey, User, useLogout } from "@workspac
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { clearAuthToken } from "@/lib/api-base";
+import { AccountSwitcher } from "@/components/layout/account-switcher";
+import { clearAuthToken, setActiveAccountId } from "@/lib/api-base";
 
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -72,6 +73,7 @@ export function Sidebar({ user, onNavigate }: { user: User; onNavigate?: () => v
       onSuccess: () => {
         // Drop the cross-origin bearer token (no-op on Replit/cookie auth).
         clearAuthToken();
+        setActiveAccountId(null);
         queryClient.clear();
         setLocation("/");
       }
@@ -203,7 +205,8 @@ export function Sidebar({ user, onNavigate }: { user: User; onNavigate?: () => v
         </div>
       </div>
 
-      <div className="p-4 shrink-0">
+      <div className="p-4 shrink-0 space-y-3">
+        <AccountSwitcher />
         <div className="flex items-center gap-3 px-3 py-3 rounded-xl border border-sidebar-border bg-sidebar-accent/30 shadow-sm">
           <Avatar className="h-9 w-9 rounded-lg border border-sidebar-border/50">
             {user.picture ? <AvatarImage src={user.picture} alt={user.name} className="rounded-lg" /> : null}

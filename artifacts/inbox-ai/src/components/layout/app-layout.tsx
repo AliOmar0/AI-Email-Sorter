@@ -3,6 +3,7 @@ import { Menu, Sparkles } from "lucide-react";
 import { Sidebar } from "./sidebar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { WelcomeDialog } from "./welcome-dialog";
 import { User } from "@workspace/api-client-react";
 
 export function AppLayout({ children, user }: { children: React.ReactNode; user: User }) {
@@ -56,6 +57,8 @@ export function AppLayout({ children, user }: { children: React.ReactNode; user:
 
         {children}
       </main>
+
+      <WelcomeDialog />
     </div>
   );
 }

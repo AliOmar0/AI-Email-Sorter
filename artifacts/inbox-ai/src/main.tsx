@@ -1,8 +1,8 @@
 import { createRoot } from "react-dom/client";
-import { setBaseUrl, setAuthTokenGetter } from "@workspace/api-client-react";
+import { setBaseUrl, setAuthTokenGetter, setAccountIdGetter } from "@workspace/api-client-react";
 import App from "./App";
 import "./index.css";
-import { API_BASE_URL, getAuthToken, setAuthToken } from "@/lib/api-base";
+import { API_BASE_URL, getAuthToken, setAuthToken, getActiveAccountId } from "@/lib/api-base";
 
 // Cross-origin deploy: when VITE_API_BASE_URL is set the frontend lives on a
 // different origin than the API, so it cannot use the session cookie. Point the
@@ -25,5 +25,9 @@ if (API_BASE_URL) {
 
   setAuthTokenGetter(() => getAuthToken());
 }
+
+// Multi-account: send the locally-selected active account on every request
+// (both cookie and bearer modes). When unset the backend uses the primary.
+setAccountIdGetter(() => getActiveAccountId());
 
 createRoot(document.getElementById("root")!).render(<App />);

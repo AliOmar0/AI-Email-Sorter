@@ -23,6 +23,20 @@ export function clearAuthToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+// Active connected-account selector (multi-account). Persisted locally and sent
+// as the X-Account-Id header so the backend targets the right mailbox. Used in
+// both same-origin (cookie) and cross-origin (bearer) deployments.
+const ACCOUNT_KEY = "inbox-ai-active-account";
+
+export function getActiveAccountId(): string | null {
+  return localStorage.getItem(ACCOUNT_KEY);
+}
+
+export function setActiveAccountId(id: string | number | null): void {
+  if (id === null || id === "") localStorage.removeItem(ACCOUNT_KEY);
+  else localStorage.setItem(ACCOUNT_KEY, String(id));
+}
+
 // Prefixes an API path with the remote backend origin when configured. Used for
 // full-page navigations (OAuth redirect) that bypass the fetch client.
 export function apiUrl(path: string): string {

@@ -1,5 +1,5 @@
 import { google, type Auth } from "googleapis";
-import { db, usersTable, type User } from "@workspace/db";
+import { db, usersTable, accountsTable, type User, type Account } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { encrypt, decrypt } from "./crypto";
 import { logger } from "./logger";
@@ -123,6 +123,37 @@ export function clientForUser(user: User): OAuth2Client {
       .set(updates)
       .where(eq(usersTable.id, user.id))
       .catch((err) => logger.error({ err }, "Failed to persist refreshed tokens"));
+  });
+
+  return client;
+}
+
+// Returns an OAuth client primed with a connected account's stored credentials.
+// Refreshed tokens are persisted back onto the account row. This is the
+// multi-account path; routes use the request's active account.
+export function clientForAccount(account: Account): OAuth2Client {
+  const client = createOAuthClient();
+  client.setCredentials({
+    access_token: account.accessToken ? decrypt(account.accessToken) : undefined,
+    refresh_token: account.refreshToken
+      ? decrypt(account.refreshToken)
+      : undefined,
+    expiry_date: account.tokenExpiry ? account.tokenExpiry.getTime() : undefined,
+  });
+
+  client.on("tokens", (tokens: Auth.Credentials) => {
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (tokens.access_token) updates["accessToken"] = encrypt(tokens.access_token);
+    if (tokens.refresh_token)
+      updates["refreshToken"] = encrypt(tokens.refresh_token);
+    if (tokens.expiry_date)
+      updates["tokenExpiry"] = new Date(tokens.expiry_date);
+    db.update(accountsTable)
+      .set(updates)
+      .where(eq(accountsTable.id, account.id))
+      .catch((err) =>
+        logger.error({ err }, "Failed to persist refreshed account tokens"),
+      );
   });
 
   return client;
