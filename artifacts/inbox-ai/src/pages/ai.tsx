@@ -40,7 +40,7 @@ export default function AIStudioPage() {
       // invocation runs long enough to hit the gateway timeout (504). DeepSeek
       // calls are slow, so a whole-mailbox pass in one request times out.
       const unlabeled = await listEmails({ view: "unlabeled" });
-      const ids = unlabeled.map((e) => e.id);
+      const ids = unlabeled.emails.map((e) => e.id);
 
       if (ids.length === 0) {
         toast({ title: "Nothing to label", description: "No unlabeled emails found." });

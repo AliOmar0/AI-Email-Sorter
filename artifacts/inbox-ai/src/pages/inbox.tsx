@@ -1,27 +1,34 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearch, useLocation } from "wouter";
-import { 
-  useListEmails, 
-  getListEmailsQueryKey, 
+import {
+  useListEmails,
+  getListEmailsQueryKey,
+  listEmails,
   useGetEmail,
   getGetEmailQueryKey,
   useUpdateEmail,
   useSetEmailLabels,
   useRemoveEmailLabel,
   useBulkLabelEmails,
+  useBulkEmailAction,
+  useUnsubscribeEmail,
   useSuggestEmailLabels,
   useCreateLabel,
   useListLabels,
   getListLabelsQueryKey,
+  getGetStatsQueryKey,
   Label,
   Email,
-  ListEmailsView
+  EmailPage,
+  ListEmailsView,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { 
-  Star, Inbox as InboxIcon, Tags, Filter, 
-  CheckSquare, Sparkles, X, Loader2, Mail, ArrowLeft
+import {
+  Star, Inbox as InboxIcon, Tags, Filter,
+  CheckSquare, Sparkles, X, Loader2, Mail, ArrowLeft,
+  Archive, Trash2, ShieldAlert, MailOpen, Reply, Forward,
+  PenSquare, Ban,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
@@ -32,6 +39,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { cn } from "@/lib/utils";
 import { LabelBadge } from "@/components/labels/label-badge";
 import { EmailBody } from "@/components/inbox/email-body";
+import { ComposeDialog, ComposeMode } from "@/components/inbox/compose-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { LabelPicker } from "@/components/labels/label-picker";
 
@@ -41,6 +49,21 @@ const VIEWS: { value: ListEmailsView; label: string; icon: typeof InboxIcon }[] 
   { value: "starred", label: "Starred", icon: Star },
   { value: "unread", label: "Unread", icon: CheckSquare },
 ];
+
+// High-level mailbox actions backed by /emails/bulk-action.
+type MailAction = "archive" | "trash" | "spam" | "markRead" | "markUnread";
+
+const isTypingTarget = (el: EventTarget | null): boolean => {
+  const node = el as HTMLElement | null;
+  if (!node) return false;
+  const tag = node.tagName;
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    node.isContentEditable
+  );
+};
 
 export default function InboxPage() {
   // Filters live in the URL so the sidebar (labels + search) and the view tabs
@@ -56,32 +79,94 @@ export default function InboxPage() {
 
   const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set());
   const [activeEmailId, setActiveEmailId] = useState<string | null>(null);
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const [composeOpen, setComposeOpen] = useState(false);
 
-  // Whenever the active filter changes, close any open email and clear the
-  // current selection so they never point at a row that's no longer listed.
-  useEffect(() => {
-    setActiveEmailId(null);
-    setSelectedEmailIds(new Set());
-  }, [view, labelIdFilter, search]);
+  // Pagination: react-query owns the first page (so it stays cached + is
+  // invalidated by label/action mutations); subsequent "load more" pages are
+  // appended here and reset whenever the active filter changes.
+  const [appended, setAppended] = useState<Email[]>([]);
+  const [moreToken, setMoreToken] = useState<string | null | undefined>(undefined);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: emails = [], isLoading: isLoadingEmails } = useListEmails(
-    { view, labelId: labelIdFilter, search },
-    { query: { queryKey: getListEmailsQueryKey({ view, labelId: labelIdFilter, search }) } }
+  const listParams = { view, labelId: labelIdFilter, search };
+  const { data: page, isLoading: isLoadingEmails } = useListEmails(
+    listParams,
+    { query: { queryKey: getListEmailsQueryKey(listParams) } }
   );
 
   const { data: labels = [] } = useListLabels({ query: { queryKey: getListLabelsQueryKey() } });
 
   const updateEmail = useUpdateEmail();
   const bulkLabel = useBulkLabelEmails();
+  const bulkActionMut = useBulkEmailAction();
   const createLabel = useCreateLabel();
+
+  // Whenever the active filter changes, close any open email, clear the
+  // selection, and reset pagination so nothing points at a stale row.
+  useEffect(() => {
+    setActiveEmailId(null);
+    setSelectedEmailIds(new Set());
+    setFocusedIndex(0);
+    setAppended([]);
+    setMoreToken(undefined);
+  }, [view, labelIdFilter, search]);
+
+  // Deduped, ordered list = first page (react-query) + appended pages.
+  const emails = useMemo(() => {
+    const seen = new Set<string>();
+    const out: Email[] = [];
+    for (const e of [...(page?.emails ?? []), ...appended]) {
+      if (seen.has(e.id)) continue;
+      seen.add(e.id);
+      out.push(e);
+    }
+    return out;
+  }, [page?.emails, appended]);
+
+  const nextToken = appended.length === 0 ? page?.nextPageToken ?? null : moreToken ?? null;
+  const hasMore = Boolean(nextToken);
 
   const activeLabel = labelIdFilter ? labels.find((l) => l.id === labelIdFilter) : undefined;
 
-  // Change one filter while preserving the rest of the query string (e.g. an
-  // active search), so filters compose instead of clobbering each other.
+  // Optimistically patch an email everywhere it's displayed (list cache, the
+  // appended pages, and the open-email cache) so read/star toggles feel instant
+  // instead of waiting for the round-trip + refetch.
+  const patchEmailEverywhere = useCallback(
+    (id: string, patch: Partial<Email>) => {
+      queryClient.setQueryData<EmailPage>(
+        getListEmailsQueryKey(listParams),
+        (old) =>
+          old
+            ? { ...old, emails: old.emails.map((e) => (e.id === id ? { ...e, ...patch } : e)) }
+            : old,
+      );
+      setAppended((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+      queryClient.setQueryData<Email>(getGetEmailQueryKey(id), (old) =>
+        old ? { ...old, ...patch } : old,
+      );
+    },
+    [queryClient, view, labelIdFilter, search], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const loadMore = async () => {
+    const token = nextToken;
+    if (!token || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await listEmails({ ...listParams, pageToken: token });
+      setAppended((prev) => [...prev, ...res.emails]);
+      setMoreToken(res.nextPageToken);
+    } catch {
+      toast({ title: "Couldn't load more", variant: "destructive" });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const navigateWithParams = (mutate: (p: URLSearchParams) => void) => {
     const next = new URLSearchParams(searchString);
     mutate(next);
@@ -104,80 +189,205 @@ export default function InboxPage() {
     if (selectedEmailIds.size === emails.length) {
       setSelectedEmailIds(new Set());
     } else {
-      setSelectedEmailIds(new Set(emails.map(e => e.id)));
+      setSelectedEmailIds(new Set(emails.map((e) => e.id)));
     }
   };
 
   const toggleSelect = (id: string) => {
     const newSet = new Set(selectedEmailIds);
-    if (newSet.has(id)) {
-      newSet.delete(id);
-    } else {
-      newSet.add(id);
-    }
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
     setSelectedEmailIds(newSet);
   };
 
-  const handleToggleStar = async (email: Email) => {
-    await updateEmail.mutateAsync({ id: email.id, data: { isStarred: !email.isStarred } });
-    queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() });
+  const handleToggleStar = (email: Email) => {
+    const next = !email.isStarred;
+    patchEmailEverywhere(email.id, { isStarred: next });
+    updateEmail.mutate(
+      { id: email.id, data: { isStarred: next } },
+      {
+        onError: () => {
+          patchEmailEverywhere(email.id, { isStarred: !next });
+          toast({ title: "Couldn't update star", variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  const handleToggleRead = (email: Email) => {
+    const next = !email.isRead;
+    patchEmailEverywhere(email.id, { isRead: next });
+    updateEmail.mutate(
+      { id: email.id, data: { isRead: next } },
+      {
+        onError: () => {
+          patchEmailEverywhere(email.id, { isRead: !next });
+          toast({ title: "Couldn't update read state", variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  // Apply a mailbox action (archive/trash/spam/read) to a set of emails.
+  const applyMailAction = async (ids: string[], action: MailAction) => {
+    if (ids.length === 0) return;
+
+    // markRead/markUnread are reversible visual state — patch optimistically.
+    if (action === "markRead" || action === "markUnread") {
+      const read = action === "markRead";
+      ids.forEach((id) => patchEmailEverywhere(id, { isRead: read }));
+    }
+
+    try {
+      await bulkActionMut.mutateAsync({ data: { emailIds: ids, action } });
+      queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() });
+      // archive/trash/spam remove rows from the view — drop appended pages so
+      // the refetched first page is authoritative.
+      if (action === "archive" || action === "trash" || action === "spam") {
+        setAppended([]);
+        setMoreToken(undefined);
+        if (activeEmailId && ids.includes(activeEmailId)) setActiveEmailId(null);
+      }
+      setSelectedEmailIds(new Set());
+      const verb =
+        action === "archive" ? "Archived"
+        : action === "trash" ? "Moved to trash"
+        : action === "spam" ? "Marked as spam"
+        : action === "markRead" ? "Marked as read"
+        : "Marked as unread";
+      toast({ title: verb, description: `${ids.length} email${ids.length > 1 ? "s" : ""}.` });
+    } catch {
+      queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() });
+      toast({ title: "Action failed", description: "Please try again.", variant: "destructive" });
+    }
   };
 
   const handleBulkAction = async (action: "add" | "remove", targetLabelId: string) => {
     if (selectedEmailIds.size === 0) return;
-    
     try {
       await bulkLabel.mutateAsync({
-        data: {
-          emailIds: Array.from(selectedEmailIds),
-          labelId: targetLabelId,
-          action
-        }
+        data: { emailIds: Array.from(selectedEmailIds), labelId: targetLabelId, action },
       });
       queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() });
       toast({
         title: `Labels ${action === "add" ? "applied" : "removed"}`,
-        description: `Successfully processed ${selectedEmailIds.size} emails.`
+        description: `Successfully processed ${selectedEmailIds.size} emails.`,
       });
       setSelectedEmailIds(new Set());
     } catch (e) {
-      toast({
-        title: "Error",
-        description: "Failed to process bulk action.",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to process bulk action.", variant: "destructive" });
     }
   };
 
   const handleBulkCreateAndApply = async (name: string, color: string) => {
     if (selectedEmailIds.size === 0) return;
     try {
-      const newLabel = await createLabel.mutateAsync({
-        data: { name, color }
-      });
+      const newLabel = await createLabel.mutateAsync({ data: { name, color } });
       queryClient.invalidateQueries({ queryKey: getListLabelsQueryKey() });
       await handleBulkAction("add", newLabel.id);
     } catch (e) {
-      toast({
-        title: "Error",
-        description: "Failed to create label.",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to create label.", variant: "destructive" });
     }
   };
+
+  // Keyboard shortcuts (Gmail-style). The "current" target is the open email,
+  // or the highlighted row when browsing the list.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target) || composeOpen) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const current =
+        (activeEmailId && emails.find((x) => x.id === activeEmailId)) ||
+        emails[focusedIndex];
+
+      switch (e.key) {
+        case "j":
+        case "ArrowDown":
+          if (emails.length) {
+            e.preventDefault();
+            setFocusedIndex((i) => Math.min(i + 1, emails.length - 1));
+          }
+          break;
+        case "k":
+        case "ArrowUp":
+          if (emails.length) {
+            e.preventDefault();
+            setFocusedIndex((i) => Math.max(i - 1, 0));
+          }
+          break;
+        case "Enter":
+        case "o":
+          if (emails[focusedIndex]) {
+            e.preventDefault();
+            setActiveEmailId(emails[focusedIndex].id);
+          }
+          break;
+        case "x":
+          if (emails[focusedIndex]) {
+            e.preventDefault();
+            toggleSelect(emails[focusedIndex].id);
+          }
+          break;
+        case "e":
+          if (current) {
+            e.preventDefault();
+            applyMailAction(
+              selectedEmailIds.size > 0 ? [...selectedEmailIds] : [current.id],
+              "archive",
+            );
+          }
+          break;
+        case "#":
+          if (current) {
+            e.preventDefault();
+            applyMailAction(
+              selectedEmailIds.size > 0 ? [...selectedEmailIds] : [current.id],
+              "trash",
+            );
+          }
+          break;
+        case "s":
+          if (current) {
+            e.preventDefault();
+            handleToggleStar(current);
+          }
+          break;
+        case "u":
+          if (current) {
+            e.preventDefault();
+            handleToggleRead({ ...current, isRead: true }); // toggles to unread
+          }
+          break;
+        case "Escape":
+          if (activeEmailId) {
+            e.preventDefault();
+            setActiveEmailId(null);
+          }
+          break;
+        default:
+          break;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [emails, focusedIndex, activeEmailId, selectedEmailIds, composeOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectionActive = selectedEmailIds.size > 0;
 
   const emailListPanel = (
     <div className="h-full flex flex-col min-w-0">
       <div className="border-b border-border/50 bg-background z-10 shrink-0">
         <div className="h-14 flex items-center justify-between px-4">
           <div className="flex items-center gap-3 min-w-0">
-            <Checkbox 
+            <Checkbox
               checked={emails.length > 0 && selectedEmailIds.size === emails.length}
               onCheckedChange={toggleSelectAll}
               aria-label="Select all"
               className="rounded-[4px]"
             />
-            {selectedEmailIds.size > 0 ? (
+            {selectionActive ? (
               <span className="text-sm text-foreground font-medium whitespace-nowrap">
                 {selectedEmailIds.size} selected
               </span>
@@ -185,7 +395,7 @@ export default function InboxPage() {
               <div className="flex items-center gap-2 min-w-0">
                 <span
                   className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: activeLabel.color || '#888' }}
+                  style={{ backgroundColor: activeLabel.color || "#888" }}
                 />
                 <span className="text-sm text-foreground font-semibold truncate">
                   {activeLabel.name}
@@ -206,9 +416,29 @@ export default function InboxPage() {
               </span>
             )}
           </div>
-          
-          {selectedEmailIds.size > 0 && (
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 animate-in fade-in zoom-in-95 duration-200">
+
+          {selectionActive ? (
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 animate-in fade-in zoom-in-95 duration-200">
+              <Button variant="ghost" size="icon" title="Archive" aria-label="Archive selected"
+                onClick={() => applyMailAction([...selectedEmailIds], "archive")}
+                className="h-9 w-9 sm:h-8 sm:w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full">
+                <Archive className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" title="Delete (trash)" aria-label="Move selected to trash"
+                onClick={() => applyMailAction([...selectedEmailIds], "trash")}
+                className="h-9 w-9 sm:h-8 sm:w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full">
+                <Trash2 className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" title="Report spam" aria-label="Mark selected as spam"
+                onClick={() => applyMailAction([...selectedEmailIds], "spam")}
+                className="h-9 w-9 sm:h-8 sm:w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full">
+                <ShieldAlert className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" title="Mark as read" aria-label="Mark selected as read"
+                onClick={() => applyMailAction([...selectedEmailIds], "markRead")}
+                className="h-9 w-9 sm:h-8 sm:w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full">
+                <MailOpen className="w-4 h-4" />
+              </Button>
               <LabelPicker
                 align="end"
                 trigger={
@@ -219,11 +449,7 @@ export default function InboxPage() {
                 }
                 onCreate={handleBulkCreateAndApply}
                 sections={[
-                  {
-                    heading: "Apply Label",
-                    labels,
-                    onSelect: (id) => handleBulkAction("add", id),
-                  },
+                  { heading: "Apply Label", labels, onSelect: (id) => handleBulkAction("add", id) },
                   {
                     heading: "Remove Label",
                     labels,
@@ -243,10 +469,20 @@ export default function InboxPage() {
                 <X className="w-4 h-4" />
               </Button>
             </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 sm:h-8 gap-2 px-3 border-border/60 shadow-none shrink-0"
+              onClick={() => setComposeOpen(true)}
+            >
+              <PenSquare className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Compose</span>
+            </Button>
           )}
         </div>
 
-        {/* View filter tabs (moved out of the old duplicate side panel) */}
+        {/* View filter tabs */}
         <div className="flex items-center gap-1 px-3 pb-2 overflow-x-auto">
           {VIEWS.map((v) => {
             const Icon = v.icon;
@@ -271,142 +507,137 @@ export default function InboxPage() {
       </div>
 
       <ScrollArea className="flex-1 bg-background">
-          {isLoadingEmails ? (
-            <div className="divide-y divide-border/30">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="p-4 space-y-3">
-                  <div className="flex justify-between">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-3 w-12" />
-                  </div>
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-full" />
+        {isLoadingEmails ? (
+          <div className="divide-y divide-border/30">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="p-4 space-y-3">
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-12" />
                 </div>
-              ))}
-            </div>
-          ) : emails.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-muted-foreground">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4 bg-muted/50 text-muted-foreground">
-                <InboxIcon className="w-6 h-6 opacity-50" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-full" />
               </div>
-              <p className="font-medium text-foreground text-sm">No emails found</p>
-              <p className="text-xs mt-1">You're all caught up.</p>
+            ))}
+          </div>
+        ) : emails.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center text-muted-foreground">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4 bg-muted/50 text-muted-foreground">
+              <InboxIcon className="w-6 h-6 opacity-50" />
             </div>
-          ) : (
-            <div className="divide-y divide-border/40">
-              {emails.map(email => (
-                <div 
-                  key={email.id}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Open email from ${email.sender}: ${email.subject}`}
-                  className={cn(
-                    "group flex items-start gap-3 p-4 cursor-pointer transition-colors relative",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-                    activeEmailId === email.id ? "bg-muted/40" : "hover:bg-muted/20",
-                  )}
-                  onClick={() => setActiveEmailId(email.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setActiveEmailId(email.id);
-                    }
-                  }}
-                >
-                  {/* Read status indicator */}
-                  {!email.isRead && (
-                    <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary" />
-                  )}
+            <p className="font-medium text-foreground text-sm">No emails found</p>
+            <p className="text-xs mt-1">You're all caught up.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border/40">
+            {emails.map((email, idx) => (
+              <div
+                key={email.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open email from ${email.sender}: ${email.subject}`}
+                className={cn(
+                  "group flex items-start gap-3 p-4 cursor-pointer transition-colors relative",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                  activeEmailId === email.id ? "bg-muted/40" : "hover:bg-muted/20",
+                  focusedIndex === idx && !activeEmailId ? "ring-1 ring-inset ring-primary/40" : "",
+                )}
+                onClick={() => { setActiveEmailId(email.id); setFocusedIndex(idx); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setActiveEmailId(email.id);
+                  }
+                }}
+              >
+                {!email.isRead && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary" />}
 
-                  <div className="pt-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-                    <Checkbox 
-                      className="rounded-[4px] data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
-                      checked={selectedEmailIds.has(email.id)}
-                      onCheckedChange={() => toggleSelect(email.id)}
-                    />
+                <div className="pt-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    className="rounded-[4px] data-[state=checked]:bg-foreground data-[state=checked]:border-foreground"
+                    checked={selectedEmailIds.has(email.id)}
+                    onCheckedChange={() => toggleSelect(email.id)}
+                  />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className={cn("truncate text-sm", !email.isRead ? "text-foreground font-semibold" : "text-foreground/70 font-medium")}>
+                      {email.sender}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap ml-2 tabular-nums">
+                      {format(new Date(email.receivedAt), "MMM d")}
+                    </span>
                   </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className={cn("truncate text-sm", !email.isRead ? "text-foreground font-semibold" : "text-foreground/70 font-medium")}>
-                        {email.sender}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap ml-2 tabular-nums">
-                        {format(new Date(email.receivedAt), 'MMM d')}
-                      </span>
-                    </div>
-                    
-                    <div className={cn("text-sm truncate mb-1", !email.isRead ? "text-foreground font-medium" : "text-muted-foreground")}>
-                      {email.subject}
-                    </div>
-                    
-                    <div className="text-xs text-muted-foreground truncate mb-2 leading-relaxed">
-                      {email.snippet}
-                    </div>
 
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="flex flex-wrap gap-1.5">
-                        {email.labels.slice(0, 3).map(l => (
-                          <LabelBadge key={l.id} label={l} />
-                        ))}
-                        {email.labels.length > 3 && (
-                          <span className="text-[10px] text-muted-foreground px-1 py-0.5 bg-muted rounded-full">+{email.labels.length - 3}</span>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        aria-label={email.isStarred ? `Unstar email from ${email.sender}` : `Star email from ${email.sender}`}
-                        aria-pressed={email.isStarred}
-                        title={email.isStarred ? "Unstar" : "Star"}
-                        className="shrink-0 rounded-full p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        onClick={(e) => { e.stopPropagation(); handleToggleStar(email); }}
-                      >
-                        <Star className={cn("w-4 h-4 transition-colors", email.isStarred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30 hover:text-muted-foreground")} strokeWidth={email.isStarred ? 2 : 1.5} />
-                      </button>
+                  <div className={cn("text-sm truncate mb-1", !email.isRead ? "text-foreground font-medium" : "text-muted-foreground")}>
+                    {email.subject}
+                  </div>
+
+                  <div className="text-xs text-muted-foreground truncate mb-2 leading-relaxed">
+                    {email.snippet}
+                  </div>
+
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex flex-wrap gap-1.5">
+                      {email.labels.slice(0, 3).map((l) => (
+                        <LabelBadge key={l.id} label={l} />
+                      ))}
+                      {email.labels.length > 3 && (
+                        <span className="text-[10px] text-muted-foreground px-1 py-0.5 bg-muted rounded-full">+{email.labels.length - 3}</span>
+                      )}
                     </div>
+                    <button
+                      type="button"
+                      aria-label={email.isStarred ? `Unstar email from ${email.sender}` : `Star email from ${email.sender}`}
+                      aria-pressed={email.isStarred}
+                      title={email.isStarred ? "Unstar" : "Star"}
+                      className="shrink-0 rounded-full p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={(e) => { e.stopPropagation(); handleToggleStar(email); }}
+                    >
+                      <Star className={cn("w-4 h-4 transition-colors", email.isStarred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30 hover:text-muted-foreground")} strokeWidth={email.isStarred ? 2 : 1.5} />
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </ScrollArea>
+              </div>
+            ))}
+
+            {hasMore && (
+              <div className="p-4 flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="gap-2 border-border/60 shadow-none"
+                >
+                  {loadingMore ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  Load more
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </ScrollArea>
     </div>
   );
 
-  // Two panels: the email list (driven by the sidebar + view tabs) and, only
-  // once an email is opened, a reading pane beside it.
   return (
     <div className="h-full w-full bg-background">
       {activeEmailId ? (
         isMobile ? (
-          // On phones the reading pane takes over the full screen with a back
-          // button, instead of being squeezed into a narrow side-by-side split.
           <div className="h-full flex flex-col bg-background relative z-0 min-w-0">
-            <EmailDetail
-              emailId={activeEmailId}
-              labels={labels}
-              onClose={() => setActiveEmailId(null)}
-            />
+            <EmailDetail emailId={activeEmailId} labels={labels} onClose={() => setActiveEmailId(null)} onArchived={() => setActiveEmailId(null)} />
           </div>
         ) : (
-          <ResizablePanelGroup
-            direction="horizontal"
-            autoSaveId="inbox-reader"
-            className="h-full w-full"
-          >
+          <ResizablePanelGroup direction="horizontal" autoSaveId="inbox-reader" className="h-full w-full">
             <ResizablePanel defaultSize={42} minSize={28}>
               {emailListPanel}
             </ResizablePanel>
-
             <ResizableHandle withHandle />
-
             <ResizablePanel defaultSize={58} minSize={30}>
               <div className="h-full flex flex-col bg-background relative z-0 min-w-0">
-                <EmailDetail 
-                  emailId={activeEmailId} 
-                  labels={labels}
-                  onClose={() => setActiveEmailId(null)}
-                />
+                <EmailDetail emailId={activeEmailId} labels={labels} onClose={() => setActiveEmailId(null)} onArchived={() => setActiveEmailId(null)} />
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
@@ -414,19 +645,38 @@ export default function InboxPage() {
       ) : (
         emailListPanel
       )}
+
+      <ComposeDialog
+        open={composeOpen}
+        onOpenChange={setComposeOpen}
+        mode="compose"
+        onSent={() => toast({ title: "Message sent" })}
+      />
     </div>
   );
 }
 
-function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: Label[], onClose: () => void }) {
+function EmailDetail({
+  emailId,
+  labels,
+  onClose,
+  onArchived,
+}: {
+  emailId: string;
+  labels: Label[];
+  onClose: () => void;
+  onArchived: () => void;
+}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
-  const { data: email, isLoading } = useGetEmail(emailId, { 
-    query: { 
-      enabled: !!emailId, 
-      queryKey: getGetEmailQueryKey(emailId) 
-    } 
+
+  const [compose, setCompose] = useState<{ open: boolean; mode: ComposeMode }>({
+    open: false,
+    mode: "reply",
+  });
+
+  const { data: email, isLoading } = useGetEmail(emailId, {
+    query: { enabled: !!emailId, queryKey: getGetEmailQueryKey(emailId) },
   });
 
   const suggestLabels = useSuggestEmailLabels();
@@ -434,6 +684,22 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
   const setLabels = useSetEmailLabels();
   const createLabel = useCreateLabel();
   const updateEmail = useUpdateEmail();
+  const bulkActionMut = useBulkEmailAction();
+  const unsubscribe = useUnsubscribeEmail();
+
+  // Mark unread emails read once opened (optimistically + persisted).
+  useEffect(() => {
+    if (email && !email.isRead) {
+      queryClient.setQueryData<Email>(getGetEmailQueryKey(email.id), (old) =>
+        old ? { ...old, isRead: true } : old,
+      );
+      updateEmail.mutate(
+        { id: email.id, data: { isRead: true } },
+        { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() }) },
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email?.id]);
 
   if (isLoading || !email) {
     return (
@@ -446,15 +712,67 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
             <Skeleton className="h-3 w-32" />
           </div>
         </div>
-        <div className="space-y-4 pt-8">
+        <div className="space-y-4 pt-8 border-t border-border/40">
           <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-[92%]" />
+          <Skeleton className="h-4 w-[97%]" />
+          <Skeleton className="h-4 w-[85%]" />
           <Skeleton className="h-4 w-[90%]" />
-          <Skeleton className="h-4 w-[95%]" />
-          <Skeleton className="h-4 w-[80%]" />
+          <Skeleton className="h-4 w-[70%]" />
         </div>
       </div>
     );
   }
+
+  const setReadOptimistic = (next: boolean) => {
+    queryClient.setQueryData<Email>(getGetEmailQueryKey(email.id), (old) =>
+      old ? { ...old, isRead: next } : old,
+    );
+    updateEmail.mutate(
+      { id: email.id, data: { isRead: next } },
+      { onSettled: () => queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() }) },
+    );
+  };
+
+  const setStarOptimistic = (next: boolean) => {
+    queryClient.setQueryData<Email>(getGetEmailQueryKey(email.id), (old) =>
+      old ? { ...old, isStarred: next } : old,
+    );
+    updateEmail.mutate(
+      { id: email.id, data: { isStarred: next } },
+      { onSettled: () => queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() }) },
+    );
+  };
+
+  const runDetailAction = async (action: MailAction) => {
+    try {
+      await bulkActionMut.mutateAsync({ data: { emailIds: [email.id], action } });
+      queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() });
+      if (action === "archive" || action === "trash" || action === "spam") onArchived();
+      const verb =
+        action === "archive" ? "Archived" : action === "trash" ? "Moved to trash" : "Marked as spam";
+      toast({ title: verb });
+    } catch {
+      toast({ title: "Action failed", variant: "destructive" });
+    }
+  };
+
+  const handleUnsubscribe = async () => {
+    try {
+      const res = await unsubscribe.mutateAsync({ id: email.id });
+      if (res.status === "posted") {
+        toast({ title: "Unsubscribed", description: "Your request was sent to the sender." });
+      } else if (res.status === "open" && res.url) {
+        window.open(res.url, "_blank", "noopener,noreferrer");
+        toast({ title: "Opened unsubscribe page", description: "Complete it in the new tab." });
+      } else {
+        toast({ title: "No unsubscribe link", description: "This sender didn't provide one.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Unsubscribe failed", variant: "destructive" });
+    }
+  };
 
   const handleRemoveLabel = async (labelId: string) => {
     try {
@@ -466,83 +784,55 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
 
   const addLabelToEmail = (labelId: string) => {
     setLabels.mutate(
-      { id: email.id, data: { labelIds: [...email.labels.map(el => el.id), labelId] } },
+      { id: email.id, data: { labelIds: [...email.labels.map((el) => el.id), labelId] } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetEmailQueryKey(email.id) });
           queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() });
         },
-      }
+      },
     );
   };
 
   const handleCreateAndApply = async (name: string, color: string) => {
     try {
-      const newLabel = await createLabel.mutateAsync({
-        data: { name, color }
-      });
+      const newLabel = await createLabel.mutateAsync({ data: { name, color } });
       queryClient.invalidateQueries({ queryKey: getListLabelsQueryKey() });
       await setLabels.mutateAsync({
         id: email.id,
-        data: { labelIds: [...email.labels.map(el => el.id), newLabel.id] }
+        data: { labelIds: [...email.labels.map((el) => el.id), newLabel.id] },
       });
       queryClient.invalidateQueries({ queryKey: getGetEmailQueryKey(email.id) });
       queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() });
-      toast({
-        title: "Label created",
-        description: `Created and applied "${name}".`
-      });
+      toast({ title: "Label created", description: `Created and applied "${name}".` });
     } catch (e) {
-      toast({
-        title: "Error",
-        description: "Failed to create label.",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to create label.", variant: "destructive" });
     }
   };
 
   const handleApplySuggestion = async (suggestion: any) => {
     try {
       let targetLabelId = suggestion.labelId;
-      
       if (suggestion.isNew) {
         const newLabel = await createLabel.mutateAsync({
-          data: {
-            name: suggestion.name,
-            color: suggestion.color || "#6366f1",
-            description: suggestion.reason
-          }
+          data: { name: suggestion.name, color: suggestion.color || "#6366f1", description: suggestion.reason },
         });
         targetLabelId = newLabel.id;
         queryClient.invalidateQueries({ queryKey: getListLabelsQueryKey() });
       }
-
-      const newLabelIds = [...new Set([...email.labels.map(l => l.id), targetLabelId])];
-      
-      await setLabels.mutateAsync({
-        id: email.id,
-        data: { labelIds: newLabelIds }
-      });
-      
+      const newLabelIds = [...new Set([...email.labels.map((l) => l.id), targetLabelId])];
+      await setLabels.mutateAsync({ id: email.id, data: { labelIds: newLabelIds } });
       queryClient.invalidateQueries({ queryKey: getGetEmailQueryKey(email.id) });
       queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() });
-      
-      toast({
-        title: "Label applied",
-        description: `Applied "${suggestion.name}" to email.`
-      });
+      toast({ title: "Label applied", description: `Applied "${suggestion.name}" to email.` });
     } catch (e) {
-      toast({
-        title: "Error",
-        description: "Failed to apply label.",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to apply label.", variant: "destructive" });
     }
   };
 
-  const requestSuggestions = () => {
-    suggestLabels.mutate({ id: email.id });
-  };
+  const requestSuggestions = () => suggestLabels.mutate({ id: email.id });
+
+  const canUnsubscribe = Boolean(email.unsubscribeUrl || email.unsubscribeMailto);
 
   return (
     <div className="flex flex-col h-full bg-background animate-in fade-in duration-300">
@@ -552,32 +842,55 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Back to inbox" className="md:hidden mr-1 text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button variant="ghost" size="icon" title="Reply" aria-label="Reply"
             className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full"
-            onClick={() => updateEmail.mutate({ id: email.id, data: { isStarred: !email.isStarred } }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetEmailQueryKey(email.id) }) })}
-          >
+            onClick={() => setCompose({ open: true, mode: "reply" })}>
+            <Reply className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" title="Forward" aria-label="Forward"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full"
+            onClick={() => setCompose({ open: true, mode: "forward" })}>
+            <Forward className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" title="Archive" aria-label="Archive"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full"
+            onClick={() => runDetailAction("archive")}>
+            <Archive className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" title="Delete (trash)" aria-label="Move to trash"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full"
+            onClick={() => runDetailAction("trash")}>
+            <Trash2 className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" title="Report spam" aria-label="Report spam"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full"
+            onClick={() => runDetailAction("spam")}>
+            <ShieldAlert className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full"
+            onClick={() => setStarOptimistic(!email.isStarred)} title={email.isStarred ? "Unstar" : "Star"} aria-label={email.isStarred ? "Unstar" : "Star"}>
             <Star className={cn("w-4 h-4", email.isStarred && "fill-yellow-400 text-yellow-400")} />
           </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button variant="ghost" size="icon"
             className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full"
-            onClick={() => updateEmail.mutate({ id: email.id, data: { isRead: !email.isRead } }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetEmailQueryKey(email.id) }) })}
-            title={email.isRead ? "Mark as unread" : "Mark as read"}
-          >
+            onClick={() => setReadOptimistic(!email.isRead)} title={email.isRead ? "Mark as unread" : "Mark as read"} aria-label={email.isRead ? "Mark as unread" : "Mark as read"}>
             <Mail className={cn("w-4 h-4", !email.isRead && "fill-foreground text-foreground")} />
           </Button>
         </div>
-        
-        {/* Secondary actions — full buttons on desktop */}
+
         <div className="hidden sm:flex items-center gap-2">
+          {canUnsubscribe && (
+            <Button variant="outline" size="sm" className="gap-2 h-8 rounded-lg border-border/60 shadow-none text-xs font-medium"
+              onClick={handleUnsubscribe} disabled={unsubscribe.isPending}>
+              {unsubscribe.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+              Unsubscribe
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="gap-2 h-8 rounded-lg border-border/60 shadow-none text-xs font-medium" onClick={requestSuggestions} disabled={suggestLabels.isPending}>
             {suggestLabels.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
             Suggest Labels
           </Button>
-          
           <LabelPicker
             align="end"
             trigger={
@@ -590,7 +903,7 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
             sections={[
               {
                 heading: "Available Labels",
-                labels: labels.filter(l => !email.labels.find(el => el.id === l.id)),
+                labels: labels.filter((l) => !email.labels.find((el) => el.id === l.id)),
                 onSelect: (id) => addLabelToEmail(id),
                 emptyText: "No more labels",
               },
@@ -598,17 +911,15 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
           />
         </div>
 
-        {/* Secondary actions — icon buttons on small phones */}
         <div className="sm:hidden flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Suggest labels"
-            title="Suggest Labels"
-            onClick={requestSuggestions}
-            disabled={suggestLabels.isPending}
-            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full"
-          >
+          {canUnsubscribe && (
+            <Button variant="ghost" size="icon" aria-label="Unsubscribe" title="Unsubscribe" onClick={handleUnsubscribe} disabled={unsubscribe.isPending}
+              className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full">
+              {unsubscribe.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" aria-label="Suggest labels" title="Suggest Labels" onClick={requestSuggestions} disabled={suggestLabels.isPending}
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full">
             {suggestLabels.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
           </Button>
           <LabelPicker
@@ -622,7 +933,7 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
             sections={[
               {
                 heading: "Add Label",
-                labels: labels.filter(l => !email.labels.find(el => el.id === l.id)),
+                labels: labels.filter((l) => !email.labels.find((el) => el.id === l.id)),
                 onSelect: (id) => addLabelToEmail(id),
                 emptyText: "No more labels",
               },
@@ -630,25 +941,16 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
           />
         </div>
 
-        {/* Close the reading pane (desktop — mobile uses the back arrow) */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onClose}
-          aria-label="Close email"
-          title="Close"
-          className="hidden md:inline-flex text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full"
-        >
+        <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close email" title="Close"
+          className="hidden md:inline-flex text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full">
           <X className="w-4 h-4" />
         </Button>
       </div>
 
       <ScrollArea className="flex-1">
         <div className="p-8 max-w-[800px] mx-auto space-y-8">
-          {/* Title & Metadata */}
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground mb-6 leading-tight">{email.subject}</h1>
-            
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-full bg-muted/80 border border-border/50 flex items-center justify-center text-foreground font-medium text-lg shrink-0">
@@ -660,28 +962,21 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
                     <span className="text-xs text-muted-foreground">&lt;{email.senderEmail}&gt;</span>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
-                    to me • {format(new Date(email.receivedAt), 'MMM d, yyyy, h:mm a')}
+                    to me • {format(new Date(email.receivedAt), "MMM d, yyyy, h:mm a")}
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Current Labels */}
           {email.labels.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-2">
-              {email.labels.map(label => (
-                <LabelBadge 
-                  key={label.id} 
-                  label={label} 
-                  size="md"
-                  onRemove={() => handleRemoveLabel(label.id)} 
-                />
+              {email.labels.map((label) => (
+                <LabelBadge key={label.id} label={label} size="md" onRemove={() => handleRemoveLabel(label.id)} />
               ))}
             </div>
           )}
 
-          {/* AI Suggestions Box */}
           {suggestLabels.isSuccess && suggestLabels.data && suggestLabels.data.length > 0 && (
             <div className="bg-muted/30 border border-border/50 rounded-2xl p-5 animate-in fade-in slide-in-from-top-4">
               <div className="flex items-center gap-2 text-foreground font-medium mb-4 text-sm">
@@ -693,9 +988,7 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
                   <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-background rounded-xl p-4 border border-border/40 shadow-sm">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <LabelBadge 
-                          label={{ name: suggestion.name, color: suggestion.color || "#6366f1" }} 
-                        />
+                        <LabelBadge label={{ name: suggestion.name, color: suggestion.color || "#6366f1" }} />
                         {suggestion.isNew && (
                           <span className="text-[10px] uppercase font-bold text-foreground bg-muted px-1.5 py-0.5 rounded-sm">New</span>
                         )}
@@ -716,10 +1009,18 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
 
           {/* Body */}
           <div className="pt-8 border-t border-border/40">
-            <EmailBody html={email.bodyHtml} text={email.body} />
+            <EmailBody html={email.bodyHtml} text={email.body} hasRemoteImages={email.hasRemoteImages} />
           </div>
         </div>
       </ScrollArea>
+
+      <ComposeDialog
+        open={compose.open}
+        onOpenChange={(open) => setCompose((c) => ({ ...c, open }))}
+        mode={compose.mode}
+        source={email}
+        onSent={() => queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() })}
+      />
     </div>
   );
 }

@@ -58,12 +58,33 @@ export interface Email {
   snippet: string;
   /** Plain-text rendering of the email body (HTML stripped). Used for previews and AI context. */
   body: string;
-  /** Sanitized HTML body for rich display. Empty string when the email has no HTML part. */
+  /** Sanitized HTML body for rich display. Empty string when the email has no HTML part. Remote image sources are held in data-blocked-src until the user displays images. */
   bodyHtml: string;
   receivedAt: string;
   isRead: boolean;
   isStarred: boolean;
   labels: Label[];
+  /** True when the sanitized HTML has remote images that were held back (blocked by default). */
+  hasRemoteImages: boolean;
+  /**
+     * One-click/managed https unsubscribe target from List-Unsubscribe, if any.
+     * @nullable
+     */
+  unsubscribeUrl: string | null;
+  /**
+     * A mailto unsubscribe target from List-Unsubscribe, if any.
+     * @nullable
+     */
+  unsubscribeMailto: string | null;
+}
+
+export interface EmailPage {
+  emails: Email[];
+  /**
+     * Cursor to fetch the next page; null when the window is exhausted.
+     * @nullable
+     */
+  nextPageToken: string | null;
 }
 
 export interface EmailUpdate {
@@ -87,6 +108,61 @@ export interface BulkLabelInput {
   emailIds: string[];
   labelId: string;
   action: BulkLabelInputAction;
+}
+
+export type BulkActionInputAction = typeof BulkActionInputAction[keyof typeof BulkActionInputAction];
+
+
+export const BulkActionInputAction = {
+  archive: 'archive',
+  trash: 'trash',
+  untrash: 'untrash',
+  spam: 'spam',
+  markRead: 'markRead',
+  markUnread: 'markUnread',
+  star: 'star',
+  unstar: 'unstar',
+} as const;
+
+export interface BulkActionInput {
+  emailIds: string[];
+  action: BulkActionInputAction;
+}
+
+export interface SendEmailInput {
+  /** Recipient address(es), comma-separated. */
+  to: string;
+  cc?: string;
+  subject: string;
+  /** Plain-text message body. */
+  body: string;
+  /** Source message id when replying/forwarding; threads the message. */
+  inReplyToId?: string;
+}
+
+export interface SendEmailResult {
+  id: string;
+  /** @nullable */
+  threadId: string | null;
+}
+
+/**
+ * posted = one-click POST done; open = client should open url; none = no target.
+ */
+export type UnsubscribeResultStatus = typeof UnsubscribeResultStatus[keyof typeof UnsubscribeResultStatus];
+
+
+export const UnsubscribeResultStatus = {
+  posted: 'posted',
+  open: 'open',
+  none: 'none',
+} as const;
+
+export interface UnsubscribeResult {
+  /** posted = one-click POST done; open = client should open url; none = no target. */
+  status: UnsubscribeResultStatus;
+  /** @nullable */
+  url: string | null;
 }
 
 export interface LabelSuggestion {
@@ -164,6 +240,10 @@ view?: ListEmailsView;
  * Gmail search query across subject, sender and body
  */
 search?: string;
+/**
+ * Opaque cursor from a previous response's nextPageToken to fetch the next page
+ */
+pageToken?: string;
 };
 
 export type ListEmailsView = typeof ListEmailsView[keyof typeof ListEmailsView];

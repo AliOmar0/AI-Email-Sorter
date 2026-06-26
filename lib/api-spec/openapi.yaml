@@ -68,7 +68,7 @@ paths:
       operationId: listEmails
       tags: [emails]
       summary: List emails
-      description: List the authenticated user's Gmail messages with optional filtering by label, view, and search.
+      description: List the authenticated user's Gmail messages with optional filtering by label, view, and search. Returns one bounded page plus a cursor for the next.
       parameters:
         - name: labelId
           in: query
@@ -89,15 +89,19 @@ paths:
           schema:
             type: string
           description: Gmail search query across subject, sender and body
+        - name: pageToken
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Opaque cursor from a previous response's nextPageToken to fetch the next page
       responses:
         "200":
-          description: A list of emails
+          description: A page of emails
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Email"
+                $ref: "#/components/schemas/EmailPage"
 
   /emails/{id}:
     get:
@@ -216,6 +220,68 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Email"
+
+  /emails/bulk-action:
+    post:
+      operationId: bulkEmailAction
+      tags: [emails]
+      summary: Perform a mailbox action across multiple emails
+      description: Archive, trash, mark spam, or change read/starred state for many emails at once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkActionInput"
+      responses:
+        "200":
+          description: The affected emails (fresh state)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Email"
+
+  /emails/send:
+    post:
+      operationId: sendEmail
+      tags: [emails]
+      summary: Send, reply to, or forward an email
+      description: Composes and sends a plain-text message via the Gmail send API. Supplying inReplyToId threads the message as a reply.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendEmailInput"
+      responses:
+        "200":
+          description: The sent message identifiers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendEmailResult"
+
+  /emails/{id}/unsubscribe:
+    post:
+      operationId: unsubscribeEmail
+      tags: [emails]
+      summary: One-click unsubscribe via the List-Unsubscribe header
+      description: Performs an RFC 8058 one-click unsubscribe POST when supported, otherwise returns a link for the client to open.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The unsubscribe outcome
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnsubscribeResult"
 
   /labels:
     get:
@@ -450,6 +516,9 @@ components:
         - isRead
         - isStarred
         - labels
+        - hasRemoteImages
+        - unsubscribeUrl
+        - unsubscribeMailto
       properties:
         id:
           type: string
@@ -466,7 +535,7 @@ components:
           description: Plain-text rendering of the email body (HTML stripped). Used for previews and AI context.
         bodyHtml:
           type: string
-          description: Sanitized HTML body for rich display. Empty string when the email has no HTML part.
+          description: Sanitized HTML body for rich display. Empty string when the email has no HTML part. Remote image sources are held in data-blocked-src until the user displays images.
         receivedAt:
           type: string
           format: date-time
@@ -478,6 +547,27 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Label"
+        hasRemoteImages:
+          type: boolean
+          description: True when the sanitized HTML has remote images that were held back (blocked by default).
+        unsubscribeUrl:
+          type: ["string", "null"]
+          description: One-click/managed https unsubscribe target from List-Unsubscribe, if any.
+        unsubscribeMailto:
+          type: ["string", "null"]
+          description: A mailto unsubscribe target from List-Unsubscribe, if any.
+
+    EmailPage:
+      type: object
+      required: [emails, nextPageToken]
+      properties:
+        emails:
+          type: array
+          items:
+            $ref: "#/components/schemas/Email"
+        nextPageToken:
+          type: ["string", "null"]
+          description: Cursor to fetch the next page; null when the window is exhausted.
 
     EmailUpdate:
       type: object
@@ -509,6 +599,56 @@ components:
         action:
           type: string
           enum: [add, remove]
+
+    BulkActionInput:
+      type: object
+      required: [emailIds, action]
+      properties:
+        emailIds:
+          type: array
+          items:
+            type: string
+        action:
+          type: string
+          enum: [archive, trash, untrash, spam, markRead, markUnread, star, unstar]
+
+    SendEmailInput:
+      type: object
+      required: [to, subject, body]
+      properties:
+        to:
+          type: string
+          description: Recipient address(es), comma-separated.
+        cc:
+          type: string
+        subject:
+          type: string
+        body:
+          type: string
+          description: Plain-text message body.
+        inReplyToId:
+          type: string
+          description: Source message id when replying/forwarding; threads the message.
+
+    SendEmailResult:
+      type: object
+      required: [id, threadId]
+      properties:
+        id:
+          type: string
+        threadId:
+          type: ["string", "null"]
+
+    UnsubscribeResult:
+      type: object
+      required: [status, url]
+      properties:
+        status:
+          type: string
+          enum: [posted, open, none]
+          description: posted = one-click POST done; open = client should open url; none = no target.
+        url:
+          type: ["string", "null"]
 
     LabelSuggestion:
       type: object

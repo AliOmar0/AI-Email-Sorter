@@ -20,4 +20,8 @@ view?: ListEmailsView;
  * Gmail search query across subject, sender and body
  */
 search?: string;
+/**
+ * Opaque cursor from a previous response's nextPageToken to fetch the next page
+ */
+pageToken?: string;
 };

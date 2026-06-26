@@ -29,23 +29,25 @@ export const GetCurrentUserResponse = zod.object({
 
 
 /**
- * List the authenticated user's Gmail messages with optional filtering by label, view, and search.
+ * List the authenticated user's Gmail messages with optional filtering by label, view, and search. Returns one bounded page plus a cursor for the next.
  * @summary List emails
  */
 export const ListEmailsQueryParams = zod.object({
   "labelId": zod.coerce.string().optional().describe('Filter to emails that have this Gmail label id'),
   "view": zod.enum(['all', 'unlabeled', 'starred', 'unread']).optional().describe('Predefined filter view'),
-  "search": zod.coerce.string().optional().describe('Gmail search query across subject, sender and body')
+  "search": zod.coerce.string().optional().describe('Gmail search query across subject, sender and body'),
+  "pageToken": zod.coerce.string().optional().describe('Opaque cursor from a previous response\'s nextPageToken to fetch the next page')
 })
 
-export const ListEmailsResponseItem = zod.object({
+export const ListEmailsResponse = zod.object({
+  "emails": zod.array(zod.object({
   "id": zod.string(),
   "sender": zod.string(),
   "senderEmail": zod.string(),
   "subject": zod.string(),
   "snippet": zod.string(),
   "body": zod.string().describe('Plain-text rendering of the email body (HTML stripped). Used for previews and AI context.'),
-  "bodyHtml": zod.string().describe('Sanitized HTML body for rich display. Empty string when the email has no HTML part.'),
+  "bodyHtml": zod.string().describe('Sanitized HTML body for rich display. Empty string when the email has no HTML part. Remote image sources are held in data-blocked-src until the user displays images.'),
   "receivedAt": zod.coerce.date(),
   "isRead": zod.boolean(),
   "isStarred": zod.boolean(),
@@ -56,9 +58,13 @@ export const ListEmailsResponseItem = zod.object({
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
-}))
+})),
+  "hasRemoteImages": zod.boolean().describe('True when the sanitized HTML has remote images that were held back (blocked by default).'),
+  "unsubscribeUrl": zod.string().nullable().describe('One-click\/managed https unsubscribe target from List-Unsubscribe, if any.'),
+  "unsubscribeMailto": zod.string().nullable().describe('A mailto unsubscribe target from List-Unsubscribe, if any.')
+})),
+  "nextPageToken": zod.string().nullable().describe('Cursor to fetch the next page; null when the window is exhausted.')
 })
-export const ListEmailsResponse = zod.array(ListEmailsResponseItem)
 
 
 /**
@@ -75,7 +81,7 @@ export const GetEmailResponse = zod.object({
   "subject": zod.string(),
   "snippet": zod.string(),
   "body": zod.string().describe('Plain-text rendering of the email body (HTML stripped). Used for previews and AI context.'),
-  "bodyHtml": zod.string().describe('Sanitized HTML body for rich display. Empty string when the email has no HTML part.'),
+  "bodyHtml": zod.string().describe('Sanitized HTML body for rich display. Empty string when the email has no HTML part. Remote image sources are held in data-blocked-src until the user displays images.'),
   "receivedAt": zod.coerce.date(),
   "isRead": zod.boolean(),
   "isStarred": zod.boolean(),
@@ -86,7 +92,10 @@ export const GetEmailResponse = zod.object({
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
-}))
+})),
+  "hasRemoteImages": zod.boolean().describe('True when the sanitized HTML has remote images that were held back (blocked by default).'),
+  "unsubscribeUrl": zod.string().nullable().describe('One-click\/managed https unsubscribe target from List-Unsubscribe, if any.'),
+  "unsubscribeMailto": zod.string().nullable().describe('A mailto unsubscribe target from List-Unsubscribe, if any.')
 })
 
 
@@ -109,7 +118,7 @@ export const UpdateEmailResponse = zod.object({
   "subject": zod.string(),
   "snippet": zod.string(),
   "body": zod.string().describe('Plain-text rendering of the email body (HTML stripped). Used for previews and AI context.'),
-  "bodyHtml": zod.string().describe('Sanitized HTML body for rich display. Empty string when the email has no HTML part.'),
+  "bodyHtml": zod.string().describe('Sanitized HTML body for rich display. Empty string when the email has no HTML part. Remote image sources are held in data-blocked-src until the user displays images.'),
   "receivedAt": zod.coerce.date(),
   "isRead": zod.boolean(),
   "isStarred": zod.boolean(),
@@ -120,7 +129,10 @@ export const UpdateEmailResponse = zod.object({
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
-}))
+})),
+  "hasRemoteImages": zod.boolean().describe('True when the sanitized HTML has remote images that were held back (blocked by default).'),
+  "unsubscribeUrl": zod.string().nullable().describe('One-click\/managed https unsubscribe target from List-Unsubscribe, if any.'),
+  "unsubscribeMailto": zod.string().nullable().describe('A mailto unsubscribe target from List-Unsubscribe, if any.')
 })
 
 
@@ -142,7 +154,7 @@ export const SetEmailLabelsResponse = zod.object({
   "subject": zod.string(),
   "snippet": zod.string(),
   "body": zod.string().describe('Plain-text rendering of the email body (HTML stripped). Used for previews and AI context.'),
-  "bodyHtml": zod.string().describe('Sanitized HTML body for rich display. Empty string when the email has no HTML part.'),
+  "bodyHtml": zod.string().describe('Sanitized HTML body for rich display. Empty string when the email has no HTML part. Remote image sources are held in data-blocked-src until the user displays images.'),
   "receivedAt": zod.coerce.date(),
   "isRead": zod.boolean(),
   "isStarred": zod.boolean(),
@@ -153,7 +165,10 @@ export const SetEmailLabelsResponse = zod.object({
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
-}))
+})),
+  "hasRemoteImages": zod.boolean().describe('True when the sanitized HTML has remote images that were held back (blocked by default).'),
+  "unsubscribeUrl": zod.string().nullable().describe('One-click\/managed https unsubscribe target from List-Unsubscribe, if any.'),
+  "unsubscribeMailto": zod.string().nullable().describe('A mailto unsubscribe target from List-Unsubscribe, if any.')
 })
 
 
@@ -172,7 +187,7 @@ export const RemoveEmailLabelResponse = zod.object({
   "subject": zod.string(),
   "snippet": zod.string(),
   "body": zod.string().describe('Plain-text rendering of the email body (HTML stripped). Used for previews and AI context.'),
-  "bodyHtml": zod.string().describe('Sanitized HTML body for rich display. Empty string when the email has no HTML part.'),
+  "bodyHtml": zod.string().describe('Sanitized HTML body for rich display. Empty string when the email has no HTML part. Remote image sources are held in data-blocked-src until the user displays images.'),
   "receivedAt": zod.coerce.date(),
   "isRead": zod.boolean(),
   "isStarred": zod.boolean(),
@@ -183,7 +198,10 @@ export const RemoveEmailLabelResponse = zod.object({
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
-}))
+})),
+  "hasRemoteImages": zod.boolean().describe('True when the sanitized HTML has remote images that were held back (blocked by default).'),
+  "unsubscribeUrl": zod.string().nullable().describe('One-click\/managed https unsubscribe target from List-Unsubscribe, if any.'),
+  "unsubscribeMailto": zod.string().nullable().describe('A mailto unsubscribe target from List-Unsubscribe, if any.')
 })
 
 
@@ -203,7 +221,7 @@ export const BulkLabelEmailsResponseItem = zod.object({
   "subject": zod.string(),
   "snippet": zod.string(),
   "body": zod.string().describe('Plain-text rendering of the email body (HTML stripped). Used for previews and AI context.'),
-  "bodyHtml": zod.string().describe('Sanitized HTML body for rich display. Empty string when the email has no HTML part.'),
+  "bodyHtml": zod.string().describe('Sanitized HTML body for rich display. Empty string when the email has no HTML part. Remote image sources are held in data-blocked-src until the user displays images.'),
   "receivedAt": zod.coerce.date(),
   "isRead": zod.boolean(),
   "isStarred": zod.boolean(),
@@ -214,9 +232,79 @@ export const BulkLabelEmailsResponseItem = zod.object({
   "description": zod.string().nullish(),
   "isSystem": zod.boolean(),
   "emailCount": zod.number()
-}))
+})),
+  "hasRemoteImages": zod.boolean().describe('True when the sanitized HTML has remote images that were held back (blocked by default).'),
+  "unsubscribeUrl": zod.string().nullable().describe('One-click\/managed https unsubscribe target from List-Unsubscribe, if any.'),
+  "unsubscribeMailto": zod.string().nullable().describe('A mailto unsubscribe target from List-Unsubscribe, if any.')
 })
 export const BulkLabelEmailsResponse = zod.array(BulkLabelEmailsResponseItem)
+
+
+/**
+ * Archive, trash, mark spam, or change read/starred state for many emails at once.
+ * @summary Perform a mailbox action across multiple emails
+ */
+export const BulkEmailActionBody = zod.object({
+  "emailIds": zod.array(zod.string()),
+  "action": zod.enum(['archive', 'trash', 'untrash', 'spam', 'markRead', 'markUnread', 'star', 'unstar'])
+})
+
+export const BulkEmailActionResponseItem = zod.object({
+  "id": zod.string(),
+  "sender": zod.string(),
+  "senderEmail": zod.string(),
+  "subject": zod.string(),
+  "snippet": zod.string(),
+  "body": zod.string().describe('Plain-text rendering of the email body (HTML stripped). Used for previews and AI context.'),
+  "bodyHtml": zod.string().describe('Sanitized HTML body for rich display. Empty string when the email has no HTML part. Remote image sources are held in data-blocked-src until the user displays images.'),
+  "receivedAt": zod.coerce.date(),
+  "isRead": zod.boolean(),
+  "isStarred": zod.boolean(),
+  "labels": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "color": zod.string().nullable().describe('A hex color string, e.g. \"#6366f1\"'),
+  "description": zod.string().nullish(),
+  "isSystem": zod.boolean(),
+  "emailCount": zod.number()
+})),
+  "hasRemoteImages": zod.boolean().describe('True when the sanitized HTML has remote images that were held back (blocked by default).'),
+  "unsubscribeUrl": zod.string().nullable().describe('One-click\/managed https unsubscribe target from List-Unsubscribe, if any.'),
+  "unsubscribeMailto": zod.string().nullable().describe('A mailto unsubscribe target from List-Unsubscribe, if any.')
+})
+export const BulkEmailActionResponse = zod.array(BulkEmailActionResponseItem)
+
+
+/**
+ * Composes and sends a plain-text message via the Gmail send API. Supplying inReplyToId threads the message as a reply.
+ * @summary Send, reply to, or forward an email
+ */
+export const SendEmailBody = zod.object({
+  "to": zod.string().describe('Recipient address(es), comma-separated.'),
+  "cc": zod.string().optional(),
+  "subject": zod.string(),
+  "body": zod.string().describe('Plain-text message body.'),
+  "inReplyToId": zod.string().optional().describe('Source message id when replying\/forwarding; threads the message.')
+})
+
+export const SendEmailResponse = zod.object({
+  "id": zod.string(),
+  "threadId": zod.string().nullable()
+})
+
+
+/**
+ * Performs an RFC 8058 one-click unsubscribe POST when supported, otherwise returns a link for the client to open.
+ * @summary One-click unsubscribe via the List-Unsubscribe header
+ */
+export const UnsubscribeEmailParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UnsubscribeEmailResponse = zod.object({
+  "status": zod.enum(['posted', 'open', 'none']).describe('posted = one-click POST done; open = client should open url; none = no target.'),
+  "url": zod.string().nullable()
+})
 
 
 /**

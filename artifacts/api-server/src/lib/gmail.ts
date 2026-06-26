@@ -1,6 +1,10 @@
 import { google, type gmail_v1, type Auth } from "googleapis";
-import sanitizeHtml from "sanitize-html";
 import { nearestGmailColor, contrastTextColor } from "./gmailColors";
+import {
+  extractBody,
+  parseListUnsubscribe,
+  type ExtractedBody,
+} from "./emailContent";
 
 type OAuth2Client = Auth.OAuth2Client;
 
@@ -25,6 +29,14 @@ export interface ApiEmail {
   isRead: boolean;
   isStarred: boolean;
   labels: ApiLabel[];
+  // True when the sanitized HTML body contains remote (http/https) <img> tags
+  // whose src has been neutralized into data-blocked-src so the client can hold
+  // them back until the user opts in ("Display images") — kills tracking pixels.
+  hasRemoteImages: boolean;
+  // Best https one-click/managed unsubscribe target from the List-Unsubscribe
+  // header (RFC 2369), or null. mailto fallback when only a mailto: is offered.
+  unsubscribeUrl: string | null;
+  unsubscribeMailto: string | null;
 }
 
 interface LabelIndexEntry {
@@ -48,6 +60,41 @@ const HIDDEN_SYSTEM_LABELS = new Set([
 
 function gmailClient(auth: OAuth2Client): gmail_v1.Gmail {
   return google.gmail({ version: "v1", auth });
+}
+
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+
+function statusOf(err: unknown): number | undefined {
+  const e = err as { code?: unknown; response?: { status?: unknown } };
+  if (typeof e?.response?.status === "number") return e.response.status;
+  if (typeof e?.code === "number") return e.code;
+  return undefined;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Gmail enforces per-user rate limits and occasionally returns transient 5xx.
+// Retry those a few times with exponential backoff + jitter. Non-retryable
+// errors (4xx other than 429) propagate immediately so the central error
+// handler can map them (e.g. 401 → "session expired").
+export async function withGmailRetry<T>(
+  fn: () => Promise<T>,
+  attempts = 4,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const status = statusOf(err);
+      if (status === undefined || !RETRYABLE_STATUS.has(status)) throw err;
+      if (i === attempts - 1) break;
+      const backoff = Math.min(8000, 2 ** i * 500) + Math.random() * 250;
+      await sleep(backoff);
+    }
+  }
+  throw lastErr;
 }
 
 function prettyLabelName(raw: string): string {
@@ -81,133 +128,6 @@ function parseFrom(from: string): { sender: string; senderEmail: string } {
     return { sender: name || email, senderEmail: email };
   }
   return { sender: from.trim(), senderEmail: from.trim() };
-}
-
-function decodeBody(data: string): string {
-  // Gmail returns part bodies as base64url (URL-safe alphabet using - and _).
-  // Decoding with plain "base64" silently corrupts any bytes that map to those
-  // characters, so we must use the base64url decoder.
-  return Buffer.from(data, "base64url").toString("utf8");
-}
-
-interface ExtractedBody {
-  // Sanitized HTML suitable for rendering in an isolated frame; "" if none.
-  html: string;
-  // Plain-text rendering for previews and AI context.
-  text: string;
-}
-
-// Safe inline-style property allowlist. Deliberately excludes anything that can
-// fetch external resources or break layout out of the frame (background-image,
-// position, etc.) — only visual/text formatting is permitted, with strict value
-// patterns so no url()/expression() payloads slip through.
-const COLOR = [/^#[0-9a-f]{3,8}$/i, /^rgba?\([\d.,\s%]+\)$/i, /^[a-z]+$/i];
-const LENGTH = [/^[\d.]+(?:px|em|rem|%|pt)$/i];
-// Box dimensions: like LENGTH but the unit is optional so bare "0" is allowed
-// (hidden preheaders commonly use height:0 / max-height:0).
-const SIZE = [/^[\d.]+(?:px|em|rem|%|pt|vh|vw)?$/i];
-const ALLOWED_STYLES = {
-  "*": {
-    color: COLOR,
-    "background-color": COLOR,
-    "text-align": [/^(left|right|center|justify)$/i],
-    "text-decoration": [/^[\w\s-]+$/i],
-    "font-size": LENGTH,
-    "font-weight": [/^(normal|bold|bolder|lighter|\d{3})$/i],
-    "font-style": [/^(normal|italic|oblique)$/i],
-    "font-family": [/^[\w\s,'"-]+$/i],
-    "line-height": [/^[\d.]+(?:px|em|rem|%)?$/i],
-    padding: [/^[\d.\s]+(?:px|em|rem|%)?$/i],
-    margin: [/^[\d.\s]+(?:px|em|rem|%)?(?:\sauto)?$/i],
-    width: SIZE,
-    "max-width": SIZE,
-    "min-width": SIZE,
-    height: SIZE,
-    "max-height": SIZE,
-    "min-height": SIZE,
-    // Visibility/layout properties: kept so senders' intentionally-hidden
-    // content (preheaders, spacers) stays hidden instead of leaking into the
-    // rendered body as stray text or blank gaps. These are purely visual and
-    // safe inside the sandboxed, script-less frame.
-    display: [
-      /^(none|block|inline|inline-block|flex|inline-flex|table|table-row|table-cell|grid|list-item)$/i,
-    ],
-    visibility: [/^(visible|hidden|collapse)$/i],
-    overflow: [/^(visible|hidden|auto|scroll)$/i],
-    "overflow-x": [/^(visible|hidden|auto|scroll)$/i],
-    "overflow-y": [/^(visible|hidden|auto|scroll)$/i],
-    border: [/^[\w\s#(),.%-]+$/i],
-    "border-radius": [/^[\d.\s]+(?:px|em|rem|%)?$/i],
-  },
-};
-
-// Whitelist-based HTML sanitization for untrusted email bodies: strips scripts,
-// <style>, event handlers, iframes, forms, etc. Keeps common formatting plus
-// (https) links and images (incl. inline data: images) so the email still reads
-// like the sender intended. Output is additionally rendered inside a sandboxed,
-// script-less iframe on the client.
-function sanitizeEmailHtml(raw: string): string {
-  return sanitizeHtml(raw, {
-    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
-      "img",
-      "center",
-      "font",
-    ]),
-    allowedAttributes: {
-      "*": ["style", "align", "width", "height", "bgcolor", "color"],
-      a: ["href", "name", "target", "rel"],
-      img: ["src", "alt", "width", "height", "style"],
-      font: ["color", "face", "size"],
-    },
-    allowedStyles: ALLOWED_STYLES,
-    // Links may only point to safe schemes; inline data: URLs are confined to
-    // image sources so they cannot be used as clickable navigation targets.
-    allowedSchemes: ["https", "mailto", "tel"],
-    allowedSchemesByTag: { img: ["https", "data"] },
-    // Drop the *content* of these tags entirely (not just the tag) so an
-    // email's <title>, stylesheet text, or <head> metadata never leaks into the
-    // rendered body as stray text.
-    nonTextTags: ["script", "style", "textarea", "option", "noscript", "title", "head"],
-    transformTags: {
-      a: sanitizeHtml.simpleTransform("a", {
-        target: "_blank",
-        rel: "noopener noreferrer",
-      }),
-    },
-  });
-}
-
-// Convert an HTML fragment to readable plain text (used when no text/plain part
-// exists and for AI context, where markup is noise).
-function htmlToText(raw: string): string {
-  return sanitizeHtml(raw, { allowedTags: [], allowedAttributes: {} })
-    .replace(/\s+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-function extractBody(
-  payload: gmail_v1.Schema$MessagePart | undefined,
-): ExtractedBody {
-  if (!payload) return { html: "", text: "" };
-  const htmlParts: string[] = [];
-  const textParts: string[] = [];
-
-  const walk = (part: gmail_v1.Schema$MessagePart) => {
-    const mime = part.mimeType ?? "";
-    if (part.body?.data) {
-      if (mime === "text/html") htmlParts.push(decodeBody(part.body.data));
-      else if (mime === "text/plain") textParts.push(decodeBody(part.body.data));
-    }
-    for (const child of part.parts ?? []) walk(child);
-  };
-  walk(payload);
-
-  const rawHtml = htmlParts.join("\n");
-  const rawText = textParts.join("\n");
-  const html = rawHtml ? sanitizeEmailHtml(rawHtml) : "";
-  const text = rawText.trim() || (rawHtml ? htmlToText(rawHtml) : "");
-  return { html, text };
 }
 
 async function getLabelIndex(
@@ -267,6 +187,10 @@ function toApiEmail(
   const receivedAt = m.internalDate
     ? new Date(Number(m.internalDate)).toISOString()
     : new Date().toISOString();
+  const listUnsub = header(headers, "List-Unsubscribe");
+  const { url: unsubscribeUrl, mailto: unsubscribeMailto } = listUnsub
+    ? parseListUnsubscribe(listUnsub)
+    : { url: null, mailto: null };
   return {
     id: m.id ?? "",
     sender,
@@ -279,6 +203,9 @@ function toApiEmail(
     isRead: !labelIds.includes("UNREAD"),
     isStarred: labelIds.includes("STARRED"),
     labels: mapEmailLabels(labelIds, index),
+    hasRemoteImages: body.hasRemoteImages,
+    unsubscribeUrl,
+    unsubscribeMailto,
   };
 }
 
@@ -287,53 +214,90 @@ function toApiEmail(
 // window rather than the entire mailbox. Call sites pass an explicit limit.
 export const DEFAULT_EMAIL_LIMIT = 50;
 
-export async function listEmails(
-  auth: OAuth2Client,
-  opts: { labelId?: string; view?: string; search?: string },
-  limit: number = DEFAULT_EMAIL_LIMIT,
-): Promise<ApiEmail[]> {
-  const gmail = gmailClient(auth);
+const EMPTY_BODY: ExtractedBody = { html: "", text: "", hasRemoteImages: false };
+
+export interface EmailPage {
+  emails: ApiEmail[];
+  // Opaque cursor for the next page; null when the window is exhausted.
+  nextPageToken: string | null;
+}
+
+function buildQuery(opts: {
+  labelId?: string;
+  view?: string;
+  search?: string;
+}): string[] {
   const q: string[] = [];
   if (opts.search) q.push(opts.search);
   if (opts.view === "unread") q.push("is:unread");
   if (opts.view === "starred") q.push("is:starred");
   if (opts.view === "unlabeled") q.push("has:nouserlabels");
   if (q.length === 0 && !opts.labelId) q.push("in:inbox");
+  return q;
+}
+
+// Paged email listing. Returns up to `limit` emails plus a cursor to fetch the
+// next window (infinite scroll / "load more"). `pageToken` resumes from a prior
+// page. Internal AI/stats callers use the array-returning listEmails wrapper.
+export async function listEmailsPaged(
+  auth: OAuth2Client,
+  opts: { labelId?: string; view?: string; search?: string; pageToken?: string },
+  limit: number = DEFAULT_EMAIL_LIMIT,
+): Promise<EmailPage> {
+  const gmail = gmailClient(auth);
+  const q = buildQuery(opts);
 
   // Page through messages.list (consuming nextPageToken) until we reach the
-  // requested limit or the result set is exhausted.
+  // requested limit or the result set is exhausted, carrying the final token so
+  // the caller can request the following window.
   const ids: string[] = [];
-  let pageToken: string | undefined;
+  let pageToken: string | undefined = opts.pageToken;
+  let nextPageToken: string | null = null;
   do {
-    const list = await gmail.users.messages.list({
-      userId: "me",
-      q: q.length ? q.join(" ") : undefined,
-      labelIds: opts.labelId ? [opts.labelId] : undefined,
-      maxResults: Math.min(100, limit - ids.length),
-      pageToken,
-    });
+    const list = await withGmailRetry(() =>
+      gmail.users.messages.list({
+        userId: "me",
+        q: q.length ? q.join(" ") : undefined,
+        labelIds: opts.labelId ? [opts.labelId] : undefined,
+        maxResults: Math.min(100, limit - ids.length),
+        pageToken,
+      }),
+    );
     for (const m of list.data.messages ?? []) {
       if (m.id) ids.push(m.id);
     }
     pageToken = list.data.nextPageToken ?? undefined;
+    nextPageToken = pageToken ?? null;
   } while (pageToken && ids.length < limit);
 
-  if (ids.length === 0) return [];
+  if (ids.length === 0) return { emails: [], nextPageToken: null };
 
   const index = await getLabelIndex(gmail);
   const msgs = await Promise.all(
     ids.map((id) =>
-      gmail.users.messages
-        .get({
+      withGmailRetry(() =>
+        gmail.users.messages.get({
           userId: "me",
           id,
           format: "metadata",
           metadataHeaders: ["From", "Subject", "Date"],
-        })
-        .then((r) => r.data),
+        }),
+      ).then((r) => r.data),
     ),
   );
-  return msgs.map((m) => toApiEmail(m, index, { html: "", text: "" }));
+  return {
+    emails: msgs.map((m) => toApiEmail(m, index, EMPTY_BODY)),
+    nextPageToken,
+  };
+}
+
+export async function listEmails(
+  auth: OAuth2Client,
+  opts: { labelId?: string; view?: string; search?: string },
+  limit: number = DEFAULT_EMAIL_LIMIT,
+): Promise<ApiEmail[]> {
+  const { emails } = await listEmailsPaged(auth, opts, limit);
+  return emails;
 }
 
 export async function getEmail(
@@ -451,7 +415,237 @@ export async function bulkLabel(
         .then((r) => r.data),
     ),
   );
-  return msgs.map((m) => toApiEmail(m, index, { html: "", text: "" }));
+  return msgs.map((m) => toApiEmail(m, index, EMPTY_BODY));
+}
+
+// Real mailbox actions beyond labelling. Maps a high-level action to Gmail
+// label mutations / dedicated endpoints, applied in bulk via batchModify where
+// possible. Returns the affected messages' fresh metadata state.
+export type EmailAction =
+  | "archive"
+  | "trash"
+  | "untrash"
+  | "spam"
+  | "markRead"
+  | "markUnread"
+  | "star"
+  | "unstar";
+
+export async function bulkAction(
+  auth: OAuth2Client,
+  emailIds: string[],
+  action: EmailAction,
+): Promise<ApiEmail[]> {
+  const gmail = gmailClient(auth);
+  const ids = [...new Set(emailIds)];
+  if (ids.length === 0) return [];
+
+  if (action === "trash") {
+    // messages.trash applies Gmail's trash semantics (retention, auto-purge)
+    // properly; batchModify can't add the TRASH system label.
+    await Promise.all(
+      ids.map((id) =>
+        withGmailRetry(() => gmail.users.messages.trash({ userId: "me", id })),
+      ),
+    );
+  } else if (action === "untrash") {
+    await Promise.all(
+      ids.map((id) =>
+        withGmailRetry(() => gmail.users.messages.untrash({ userId: "me", id })),
+      ),
+    );
+  } else {
+    const addLabelIds: string[] = [];
+    const removeLabelIds: string[] = [];
+    switch (action) {
+      case "archive":
+        removeLabelIds.push("INBOX");
+        break;
+      case "spam":
+        addLabelIds.push("SPAM");
+        removeLabelIds.push("INBOX");
+        break;
+      case "markRead":
+        removeLabelIds.push("UNREAD");
+        break;
+      case "markUnread":
+        addLabelIds.push("UNREAD");
+        break;
+      case "star":
+        addLabelIds.push("STARRED");
+        break;
+      case "unstar":
+        removeLabelIds.push("STARRED");
+        break;
+    }
+    await withGmailRetry(() =>
+      gmail.users.messages.batchModify({
+        userId: "me",
+        requestBody: { ids, addLabelIds, removeLabelIds },
+      }),
+    );
+  }
+
+  // Trashed messages are still fetchable by id; their new label set reflects the
+  // change so the client can reconcile the list.
+  const index = await getLabelIndex(gmail);
+  const msgs = await Promise.all(
+    ids.map((id) =>
+      withGmailRetry(() =>
+        gmail.users.messages.get({
+          userId: "me",
+          id,
+          format: "metadata",
+          metadataHeaders: ["From", "Subject", "Date"],
+        }),
+      )
+        .then((r) => r.data)
+        .catch(() => null),
+    ),
+  );
+  return msgs
+    .filter((m): m is gmail_v1.Schema$Message => m !== null)
+    .map((m) => toApiEmail(m, index, EMPTY_BODY));
+}
+
+export interface UnsubscribeResult {
+  // "posted" — performed an RFC 8058 one-click POST on the user's behalf.
+  // "open"   — no one-click support; client should open `url` for the user.
+  // "none"   — no usable unsubscribe target found.
+  status: "posted" | "open" | "none";
+  url: string | null;
+}
+
+// One-click unsubscribe via the List-Unsubscribe header. When the sender also
+// advertises List-Unsubscribe-Post: List-Unsubscribe=One-Click (RFC 8058) and
+// offers an https endpoint, we POST on the user's behalf. Otherwise we return
+// the https/mailto target for the client to open in a new tab.
+export async function unsubscribeEmail(
+  auth: OAuth2Client,
+  id: string,
+): Promise<UnsubscribeResult> {
+  const gmail = gmailClient(auth);
+  const { data } = await withGmailRetry(() =>
+    gmail.users.messages.get({
+      userId: "me",
+      id,
+      format: "metadata",
+      metadataHeaders: ["List-Unsubscribe", "List-Unsubscribe-Post"],
+    }),
+  );
+  const headers = data.payload?.headers;
+  const listUnsub = header(headers, "List-Unsubscribe");
+  if (!listUnsub) return { status: "none", url: null };
+
+  const { url, mailto } = parseListUnsubscribe(listUnsub);
+  const oneClick = /one-click/i.test(header(headers, "List-Unsubscribe-Post"));
+
+  if (url && oneClick) {
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "List-Unsubscribe=One-Click",
+        redirect: "follow",
+      });
+      if (resp.ok) return { status: "posted", url };
+    } catch {
+      // Fall through to letting the client open the link.
+    }
+  }
+
+  // No one-click (or it failed): hand the best target back to the client.
+  return { status: "open", url: url ?? mailto };
+}
+
+// Build a minimal RFC 5322 message and base64url-encode it for messages.send.
+function buildRawMessage(input: {
+  to: string;
+  from: string;
+  subject: string;
+  body: string;
+  cc?: string;
+  inReplyTo?: string;
+  references?: string;
+}): string {
+  const lines = [
+    `From: ${input.from}`,
+    `To: ${input.to}`,
+  ];
+  if (input.cc) lines.push(`Cc: ${input.cc}`);
+  lines.push(`Subject: ${input.subject}`);
+  if (input.inReplyTo) lines.push(`In-Reply-To: ${input.inReplyTo}`);
+  if (input.references) lines.push(`References: ${input.references}`);
+  lines.push("MIME-Version: 1.0");
+  lines.push('Content-Type: text/plain; charset="UTF-8"');
+  lines.push("Content-Transfer-Encoding: base64");
+  lines.push("");
+  // Body is base64 so non-ASCII/long lines survive transport intact.
+  lines.push(Buffer.from(input.body, "utf8").toString("base64"));
+  return Buffer.from(lines.join("\r\n"), "utf8").toString("base64url");
+}
+
+export interface SendInput {
+  to: string;
+  cc?: string;
+  subject: string;
+  body: string;
+  // When replying/forwarding, the source message id — used to thread the reply
+  // (Gmail threadId + In-Reply-To/References headers).
+  inReplyToId?: string;
+}
+
+export async function sendEmail(
+  auth: OAuth2Client,
+  input: SendInput,
+): Promise<{ id: string; threadId: string | null }> {
+  const gmail = gmailClient(auth);
+
+  // Sender identity from the authenticated mailbox.
+  const profile = await withGmailRetry(() =>
+    gmail.users.getProfile({ userId: "me" }),
+  );
+  const from = profile.data.emailAddress ?? "me";
+
+  let threadId: string | undefined;
+  let inReplyTo: string | undefined;
+  let references: string | undefined;
+
+  if (input.inReplyToId) {
+    const { data: src } = await withGmailRetry(() =>
+      gmail.users.messages.get({
+        userId: "me",
+        id: input.inReplyToId!,
+        format: "metadata",
+        metadataHeaders: ["Message-ID", "References"],
+      }),
+    );
+    threadId = src.threadId ?? undefined;
+    const msgId = header(src.payload?.headers, "Message-ID");
+    const refs = header(src.payload?.headers, "References");
+    if (msgId) {
+      inReplyTo = msgId;
+      references = refs ? `${refs} ${msgId}` : msgId;
+    }
+  }
+
+  const raw = buildRawMessage({
+    to: input.to,
+    from,
+    cc: input.cc,
+    subject: input.subject,
+    body: input.body,
+    inReplyTo,
+    references,
+  });
+
+  const { data } = await withGmailRetry(() =>
+    gmail.users.messages.send({
+      userId: "me",
+      requestBody: { raw, threadId },
+    }),
+  );
+  return { id: data.id ?? "", threadId: data.threadId ?? null };
 }
 
 export async function listLabels(auth: OAuth2Client): Promise<ApiLabel[]> {

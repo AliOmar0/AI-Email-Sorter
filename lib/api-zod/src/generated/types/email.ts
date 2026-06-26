@@ -15,10 +15,22 @@ export interface Email {
   snippet: string;
   /** Plain-text rendering of the email body (HTML stripped). Used for previews and AI context. */
   body: string;
-  /** Sanitized HTML body for rich display. Empty string when the email has no HTML part. */
+  /** Sanitized HTML body for rich display. Empty string when the email has no HTML part. Remote image sources are held in data-blocked-src until the user displays images. */
   bodyHtml: string;
   receivedAt: Date;
   isRead: boolean;
   isStarred: boolean;
   labels: Label[];
+  /** True when the sanitized HTML has remote images that were held back (blocked by default). */
+  hasRemoteImages: boolean;
+  /**
+     * One-click/managed https unsubscribe target from List-Unsubscribe, if any.
+     * @nullable
+     */
+  unsubscribeUrl: string | null;
+  /**
+     * A mailto unsubscribe target from List-Unsubscribe, if any.
+     * @nullable
+     */
+  unsubscribeMailto: string | null;
 }

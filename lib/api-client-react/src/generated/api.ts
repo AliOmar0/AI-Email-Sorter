@@ -22,10 +22,12 @@ import type {
 import type {
   AutoLabelInput,
   AutoLabelResult,
+  BulkActionInput,
   BulkLabelInput,
   Email,
   EmailGroup,
   EmailLabelInput,
+  EmailPage,
   EmailUpdate,
   Error,
   GroupSuggestInput,
@@ -35,7 +37,10 @@ import type {
   LabelSuggestion,
   LabelUpdate,
   ListEmailsParams,
+  SendEmailInput,
+  SendEmailResult,
   Stats,
+  UnsubscribeResult,
   User
 } from './api.schemas';
 
@@ -292,12 +297,12 @@ export const getListEmailsUrl = (params?: ListEmailsParams,) => {
 }
 
 /**
- * List the authenticated user's Gmail messages with optional filtering by label, view, and search.
+ * List the authenticated user's Gmail messages with optional filtering by label, view, and search. Returns one bounded page plus a cursor for the next.
  * @summary List emails
  */
-export const listEmails = async (params?: ListEmailsParams, options?: RequestInit): Promise<Email[]> => {
+export const listEmails = async (params?: ListEmailsParams, options?: RequestInit): Promise<EmailPage> => {
 
-  return customFetch<Email[]>(getListEmailsUrl(params),
+  return customFetch<EmailPage>(getListEmailsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -723,6 +728,221 @@ export const useBulkLabelEmails = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getBulkLabelEmailsMutationOptions(options));
+    }
+
+export const getBulkEmailActionUrl = () => {
+
+
+
+
+  return `/api/emails/bulk-action`
+}
+
+/**
+ * Archive, trash, mark spam, or change read/starred state for many emails at once.
+ * @summary Perform a mailbox action across multiple emails
+ */
+export const bulkEmailAction = async (bulkActionInput: BulkActionInput, options?: RequestInit): Promise<Email[]> => {
+
+  return customFetch<Email[]>(getBulkEmailActionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bulkActionInput,)
+  }
+);}
+
+
+
+
+export const getBulkEmailActionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkEmailAction>>, TError,{data: BodyType<BulkActionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkEmailAction>>, TError,{data: BodyType<BulkActionInput>}, TContext> => {
+
+const mutationKey = ['bulkEmailAction'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkEmailAction>>, {data: BodyType<BulkActionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkEmailAction(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkEmailActionMutationResult = NonNullable<Awaited<ReturnType<typeof bulkEmailAction>>>
+    export type BulkEmailActionMutationBody = BodyType<BulkActionInput>
+    export type BulkEmailActionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Perform a mailbox action across multiple emails
+ */
+export const useBulkEmailAction = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkEmailAction>>, TError,{data: BodyType<BulkActionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkEmailAction>>,
+        TError,
+        {data: BodyType<BulkActionInput>},
+        TContext
+      > => {
+      return useMutation(getBulkEmailActionMutationOptions(options));
+    }
+
+export const getSendEmailUrl = () => {
+
+
+
+
+  return `/api/emails/send`
+}
+
+/**
+ * Composes and sends a plain-text message via the Gmail send API. Supplying inReplyToId threads the message as a reply.
+ * @summary Send, reply to, or forward an email
+ */
+export const sendEmail = async (sendEmailInput: SendEmailInput, options?: RequestInit): Promise<SendEmailResult> => {
+
+  return customFetch<SendEmailResult>(getSendEmailUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      sendEmailInput,)
+  }
+);}
+
+
+
+
+export const getSendEmailMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendEmail>>, TError,{data: BodyType<SendEmailInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendEmail>>, TError,{data: BodyType<SendEmailInput>}, TContext> => {
+
+const mutationKey = ['sendEmail'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendEmail>>, {data: BodyType<SendEmailInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  sendEmail(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendEmailMutationResult = NonNullable<Awaited<ReturnType<typeof sendEmail>>>
+    export type SendEmailMutationBody = BodyType<SendEmailInput>
+    export type SendEmailMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Send, reply to, or forward an email
+ */
+export const useSendEmail = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendEmail>>, TError,{data: BodyType<SendEmailInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendEmail>>,
+        TError,
+        {data: BodyType<SendEmailInput>},
+        TContext
+      > => {
+      return useMutation(getSendEmailMutationOptions(options));
+    }
+
+export const getUnsubscribeEmailUrl = (id: string,) => {
+
+
+
+
+  return `/api/emails/${id}/unsubscribe`
+}
+
+/**
+ * Performs an RFC 8058 one-click unsubscribe POST when supported, otherwise returns a link for the client to open.
+ * @summary One-click unsubscribe via the List-Unsubscribe header
+ */
+export const unsubscribeEmail = async (id: string, options?: RequestInit): Promise<UnsubscribeResult> => {
+
+  return customFetch<UnsubscribeResult>(getUnsubscribeEmailUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getUnsubscribeEmailMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unsubscribeEmail>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unsubscribeEmail>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['unsubscribeEmail'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unsubscribeEmail>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  unsubscribeEmail(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnsubscribeEmailMutationResult = NonNullable<Awaited<ReturnType<typeof unsubscribeEmail>>>
+
+    export type UnsubscribeEmailMutationError = ErrorType<unknown>
+
+    /**
+ * @summary One-click unsubscribe via the List-Unsubscribe header
+ */
+export const useUnsubscribeEmail = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unsubscribeEmail>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unsubscribeEmail>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getUnsubscribeEmailMutationOptions(options));
     }
 
 export const getListLabelsUrl = () => {

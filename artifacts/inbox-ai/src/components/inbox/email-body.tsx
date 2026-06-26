@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
+import { ImageOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface EmailBodyProps {
   html: string;
   text: string;
+  // True when the sanitized HTML has remote images held back in data-blocked-src.
+  hasRemoteImages?: boolean;
 }
 
 // Styles for the dark/light variants of the sandboxed email frame. We can't
@@ -44,19 +48,38 @@ function frameStyles(isDark: boolean): string {
 `;
 }
 
+// Restore the held-back remote images: the server moved every remote src into a
+// data-blocked-src attribute so nothing loads by default. When the user opts in
+// we swap it back to a real src. Operating on the controlled attribute name (not
+// arbitrary parsing) keeps this safe — the HTML was already sanitized server-side.
+function revealRemoteImages(html: string): string {
+  return html.replace(/data-blocked-src=/gi, "src=");
+}
+
 /**
  * Renders an email body inside a sandboxed iframe so the sender's HTML and
  * styles are fully isolated from the app's own UI. The frame auto-sizes to its
  * content. Falls back to plain text when no HTML body is available.
+ *
+ * Remote images are blocked by default (tracking-pixel / privacy protection)
+ * and only loaded after the user clicks "Display images".
  */
-export function EmailBody({ html, text }: EmailBodyProps) {
+export function EmailBody({ html, text, hasRemoteImages = false }: EmailBodyProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(200);
+  const [showImages, setShowImages] = useState(false);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
+  // Reset the image-display opt-in whenever a different email is shown.
+  useEffect(() => {
+    setShowImages(false);
+  }, [html]);
+
+  const renderedHtml = showImages ? revealRemoteImages(html) : html;
+
   const srcDoc = html
-    ? `<!doctype html><html><head><meta charset="utf-8">${frameStyles(isDark)}</head><body>${html}</body></html>`
+    ? `<!doctype html><html><head><meta charset="utf-8">${frameStyles(isDark)}</head><body>${renderedHtml}</body></html>`
     : null;
 
   useEffect(() => {
@@ -65,6 +88,8 @@ export function EmailBody({ html, text }: EmailBodyProps) {
     if (!frame) return;
 
     let observer: ResizeObserver | null = null;
+    let rafId = 0;
+    let cancelled = false;
 
     // Measure the iframe's content height. This requires `allow-same-origin`
     // on the sandbox (scripts stay disabled), otherwise contentDocument is null.
@@ -78,12 +103,10 @@ export function EmailBody({ html, text }: EmailBodyProps) {
       if (next > 0) setHeight(next + 24); // breathing room
     };
 
-    const onLoad = () => {
+    const wireUp = (doc: Document) => {
       measure();
-      const doc = frame.contentDocument;
-      if (!doc || !doc.body) return;
 
-      // Keep resizing as fonts/images/layout settle, permanently (not just 3s).
+      // Keep resizing as fonts/images/layout settle.
       if (typeof ResizeObserver !== "undefined") {
         observer = new ResizeObserver(() => measure());
         observer.observe(doc.body);
@@ -99,11 +122,30 @@ export function EmailBody({ html, text }: EmailBodyProps) {
       });
     };
 
+    // Size the frame as soon as the (same-origin, script-less) srcDoc has
+    // parsed, rather than waiting for the iframe `load` event. `load` only
+    // fires once every remote image has finished downloading, which can leave
+    // the frame stuck at its initial height — showing an inner scrollbar — for
+    // a long time on image-heavy emails. Polling for the parsed body via rAF
+    // lets us measure within a frame or two.
+    const waitForBody = () => {
+      if (cancelled) return;
+      const doc = frame.contentDocument;
+      if (doc && doc.body) {
+        wireUp(doc);
+        return;
+      }
+      rafId = requestAnimationFrame(waitForBody);
+    };
+    waitForBody();
+
+    // A final re-measure once everything (incl. images) has fully loaded.
+    const onLoad = () => measure();
     frame.addEventListener("load", onLoad);
-    // srcDoc can be ready synchronously; attempt an immediate measure too.
-    measure();
 
     return () => {
+      cancelled = true;
+      if (rafId) cancelAnimationFrame(rafId);
       frame.removeEventListener("load", onLoad);
       observer?.disconnect();
     };
@@ -119,6 +161,22 @@ export function EmailBody({ html, text }: EmailBodyProps) {
 
   return (
     <div className="w-full bg-background rounded-lg">
+      {hasRemoteImages && !showImages && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 px-3 py-2 rounded-lg bg-muted/40 border border-border/50 text-xs text-muted-foreground">
+          <span className="flex items-center gap-2">
+            <ImageOff className="w-3.5 h-3.5 shrink-0" />
+            Remote images are blocked to protect your privacy.
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2.5 text-xs shrink-0"
+            onClick={() => setShowImages(true)}
+          >
+            Display images
+          </Button>
+        </div>
+      )}
       <iframe
         ref={frameRef}
         title="Email content"
