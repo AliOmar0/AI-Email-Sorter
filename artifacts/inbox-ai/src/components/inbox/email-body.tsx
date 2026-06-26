@@ -26,8 +26,7 @@ function frameStyles(isDark: boolean): string {
       font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-size: 14px;
       line-height: 1.6;
-      word-break: break-word;
-      overflow-wrap: anywhere;
+      overflow-wrap: break-word;
     }
     a { color: ${linkColor}; }
     img { max-width: 100% !important; height: auto !important; border-radius: 8px; }

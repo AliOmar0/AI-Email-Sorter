@@ -84,7 +84,10 @@ function parseFrom(from: string): { sender: string; senderEmail: string } {
 }
 
 function decodeBody(data: string): string {
-  return Buffer.from(data, "base64").toString("utf8");
+  // Gmail returns part bodies as base64url (URL-safe alphabet using - and _).
+  // Decoding with plain "base64" silently corrupts any bytes that map to those
+  // characters, so we must use the base64url decoder.
+  return Buffer.from(data, "base64url").toString("utf8");
 }
 
 interface ExtractedBody {
@@ -100,6 +103,9 @@ interface ExtractedBody {
 // patterns so no url()/expression() payloads slip through.
 const COLOR = [/^#[0-9a-f]{3,8}$/i, /^rgba?\([\d.,\s%]+\)$/i, /^[a-z]+$/i];
 const LENGTH = [/^[\d.]+(?:px|em|rem|%|pt)$/i];
+// Box dimensions: like LENGTH but the unit is optional so bare "0" is allowed
+// (hidden preheaders commonly use height:0 / max-height:0).
+const SIZE = [/^[\d.]+(?:px|em|rem|%|pt|vh|vw)?$/i];
 const ALLOWED_STYLES = {
   "*": {
     color: COLOR,
@@ -113,9 +119,23 @@ const ALLOWED_STYLES = {
     "line-height": [/^[\d.]+(?:px|em|rem|%)?$/i],
     padding: [/^[\d.\s]+(?:px|em|rem|%)?$/i],
     margin: [/^[\d.\s]+(?:px|em|rem|%)?(?:\sauto)?$/i],
-    width: LENGTH,
-    "max-width": LENGTH,
-    height: LENGTH,
+    width: SIZE,
+    "max-width": SIZE,
+    "min-width": SIZE,
+    height: SIZE,
+    "max-height": SIZE,
+    "min-height": SIZE,
+    // Visibility/layout properties: kept so senders' intentionally-hidden
+    // content (preheaders, spacers) stays hidden instead of leaking into the
+    // rendered body as stray text or blank gaps. These are purely visual and
+    // safe inside the sandboxed, script-less frame.
+    display: [
+      /^(none|block|inline|inline-block|flex|inline-flex|table|table-row|table-cell|grid|list-item)$/i,
+    ],
+    visibility: [/^(visible|hidden|collapse)$/i],
+    overflow: [/^(visible|hidden|auto|scroll)$/i],
+    "overflow-x": [/^(visible|hidden|auto|scroll)$/i],
+    "overflow-y": [/^(visible|hidden|auto|scroll)$/i],
     border: [/^[\w\s#(),.%-]+$/i],
     "border-radius": [/^[\d.\s]+(?:px|em|rem|%)?$/i],
   },
@@ -144,6 +164,10 @@ function sanitizeEmailHtml(raw: string): string {
     // image sources so they cannot be used as clickable navigation targets.
     allowedSchemes: ["https", "mailto", "tel"],
     allowedSchemesByTag: { img: ["https", "data"] },
+    // Drop the *content* of these tags entirely (not just the tag) so an
+    // email's <title>, stylesheet text, or <head> metadata never leaks into the
+    // rendered body as stray text.
+    nonTextTags: ["script", "style", "textarea", "option", "noscript", "title", "head"],
     transformTags: {
       a: sanitizeHtml.simpleTransform("a", {
         target: "_blank",
