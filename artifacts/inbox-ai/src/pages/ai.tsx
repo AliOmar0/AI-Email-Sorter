@@ -42,8 +42,15 @@ export default function AIStudioPage() {
         title: "Auto-labeling complete",
         description: `Processed ${result.processed} emails, labeled ${result.labeled}.`
       });
-    } catch (e) {
-      toast({ title: "Error", description: "Auto-labeling failed.", variant: "destructive" });
+    } catch (e: any) {
+      // Surface the actual server reason (e.g. "AI provider not configured")
+      // instead of a generic message so the failure is actionable.
+      const description =
+        e?.data?.error ??
+        e?.data?.message ??
+        e?.message ??
+        "Auto-labeling failed.";
+      toast({ title: "Auto-labeling failed", description, variant: "destructive" });
     }
   };
 

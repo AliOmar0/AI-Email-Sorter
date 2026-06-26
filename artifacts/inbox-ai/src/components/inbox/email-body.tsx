@@ -1,48 +1,49 @@
 import { useEffect, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 
 interface EmailBodyProps {
   html: string;
   text: string;
 }
 
-const FRAME_STYLES = `
+// Styles for the dark/light variants of the sandboxed email frame. We can't
+// rely on `prefers-color-scheme` because the app toggles its theme via a
+// `.dark` class (next-themes, `enableSystem={false}`), which the iframe's
+// isolated document can't see. So the active theme is injected explicitly.
+function frameStyles(isDark: boolean): string {
+  const bodyColor = isDark ? "#f3f4f6" : "#1f2937";
+  const linkColor = isDark ? "#818cf8" : "#4f46e5";
+  const quoteBorder = isDark ? "#475569" : "#cbd5e1";
+  const quoteColor = isDark ? "#94a3b8" : "#64748b";
+  return `
   <style>
-    :root { color-scheme: light dark; }
+    :root { color-scheme: ${isDark ? "dark" : "light"}; }
     html, body {
       margin: 0;
       padding: 0;
       background: transparent;
-      color: inherit;
+      color: ${bodyColor};
       font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-size: 14px;
       line-height: 1.6;
       word-break: break-word;
       overflow-wrap: anywhere;
     }
-    @media (prefers-color-scheme: dark) {
-      body { color: #f3f4f6; }
-      a { color: #818cf8; }
-    }
-    @media (prefers-color-scheme: light) {
-      body { color: #1f2937; }
-      a { color: #4f46e5; }
-    }
+    a { color: ${linkColor}; }
     img { max-width: 100% !important; height: auto !important; border-radius: 8px; }
     table { max-width: 100% !important; }
     * { max-width: 100%; box-sizing: border-box; }
-    
+
     /* Clean up default blockquotes often found in emails */
     blockquote {
-      border-left: 3px solid #cbd5e1;
+      border-left: 3px solid ${quoteBorder};
       margin-left: 0;
       padding-left: 1rem;
-      color: #64748b;
-    }
-    @media (prefers-color-scheme: dark) {
-      blockquote { border-left-color: #475569; color: #94a3b8; }
+      color: ${quoteColor};
     }
   </style>
 `;
+}
 
 /**
  * Renders an email body inside a sandboxed iframe so the sender's HTML and
@@ -52,9 +53,11 @@ const FRAME_STYLES = `
 export function EmailBody({ html, text }: EmailBodyProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(200);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
   const srcDoc = html
-    ? `<!doctype html><html><head><meta charset="utf-8">${FRAME_STYLES}</head><body>${html}</body></html>`
+    ? `<!doctype html><html><head><meta charset="utf-8">${frameStyles(isDark)}</head><body>${html}</body></html>`
     : null;
 
   useEffect(() => {

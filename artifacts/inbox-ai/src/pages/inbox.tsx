@@ -610,6 +610,18 @@ function EmailDetail({ emailId, labels, onClose }: { emailId: string, labels: La
             ]}
           />
         </div>
+
+        {/* Close the reading pane (desktop — mobile uses the back arrow) */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          aria-label="Close email"
+          title="Close"
+          className="hidden md:inline-flex text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full"
+        >
+          <X className="w-4 h-4" />
+        </Button>
       </div>
 
       <ScrollArea className="flex-1">
