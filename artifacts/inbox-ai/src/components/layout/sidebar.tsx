@@ -20,7 +20,7 @@ function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="p-2 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors shrink-0"
+      className="p-2 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-label="Toggle theme"
     >
@@ -129,7 +129,13 @@ export function Sidebar({ user, onNavigate }: { user: User; onNavigate?: () => v
               item.href === "/inbox" ? matchesPath && !activeLabelId : matchesPath;
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href} onClick={() => onNavigate?.()}>
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => onNavigate?.()}
+                aria-current={isActive ? "page" : undefined}
+                className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <div
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all",
@@ -154,7 +160,13 @@ export function Sidebar({ user, onNavigate }: { user: User; onNavigate?: () => v
             {labels.map((label) => {
               const isActive = activeLabelId === label.id;
               return (
-                <Link key={label.id} href={`/inbox?labelId=${label.id}`} onClick={() => onNavigate?.()}>
+                <Link
+                  key={label.id}
+                  href={`/inbox?labelId=${label.id}`}
+                  onClick={() => onNavigate?.()}
+                  aria-current={isActive ? "page" : undefined}
+                  className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
                   <div
                     className={cn(
                       "flex items-center justify-between px-3 py-2 rounded-xl text-sm cursor-pointer transition-all group",
@@ -205,7 +217,8 @@ export function Sidebar({ user, onNavigate }: { user: User; onNavigate?: () => v
           </div>
           <button 
             onClick={handleLogout}
-            className="p-2 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors shrink-0"
+            className="p-2 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground/50 hover:text-sidebar-foreground transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Log out"
             title="Log out"
           >
             <LogOut className="h-4 w-4" />

@@ -10,6 +10,14 @@ export function AppLayout({ children, user }: { children: React.ReactNode; user:
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
+      {/* Keyboard users can jump straight past the sidebar to the page content. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:shadow-lg"
+      >
+        Skip to content
+      </a>
+
       {/* Desktop sidebar — always visible from md up */}
       <div className="hidden md:flex shrink-0">
         <Sidebar user={user} />
@@ -26,7 +34,7 @@ export function AppLayout({ children, user }: { children: React.ReactNode; user:
         </SheetContent>
       </Sheet>
 
-      <main className="flex-1 flex flex-col h-screen overflow-hidden relative min-w-0">
+      <main id="main-content" tabIndex={-1} className="flex-1 flex flex-col h-screen overflow-hidden relative min-w-0 outline-none">
         {/* Mobile top bar with menu toggle */}
         <header className="md:hidden h-14 flex items-center gap-2 px-3 border-b border-border/50 shrink-0 bg-background">
           <Button

@@ -255,8 +255,10 @@ export default function InboxPage() {
               <button
                 key={v.value}
                 onClick={() => selectView(v.value)}
+                aria-pressed={isActive}
                 className={cn(
                   "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                 )}
               >
@@ -295,11 +297,21 @@ export default function InboxPage() {
               {emails.map(email => (
                 <div 
                   key={email.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open email from ${email.sender}: ${email.subject}`}
                   className={cn(
                     "group flex items-start gap-3 p-4 cursor-pointer transition-colors relative",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
                     activeEmailId === email.id ? "bg-muted/40" : "hover:bg-muted/20",
                   )}
                   onClick={() => setActiveEmailId(email.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setActiveEmailId(email.id);
+                    }
+                  }}
                 >
                   {/* Read status indicator */}
                   {!email.isRead && (
@@ -341,9 +353,16 @@ export default function InboxPage() {
                           <span className="text-[10px] text-muted-foreground px-1 py-0.5 bg-muted rounded-full">+{email.labels.length - 3}</span>
                         )}
                       </div>
-                      <div className="shrink-0" onClick={(e) => { e.stopPropagation(); handleToggleStar(email); }}>
+                      <button
+                        type="button"
+                        aria-label={email.isStarred ? `Unstar email from ${email.sender}` : `Star email from ${email.sender}`}
+                        aria-pressed={email.isStarred}
+                        title={email.isStarred ? "Unstar" : "Star"}
+                        className="shrink-0 rounded-full p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={(e) => { e.stopPropagation(); handleToggleStar(email); }}
+                      >
                         <Star className={cn("w-4 h-4 transition-colors", email.isStarred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30 hover:text-muted-foreground")} strokeWidth={email.isStarred ? 2 : 1.5} />
-                      </div>
+                      </button>
                     </div>
                   </div>
                 </div>
