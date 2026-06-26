@@ -1,29 +1,26 @@
-# Deploying Inbox AI (GitHub Pages frontend + Vercel backend)
+# Deploying Inbox AI (frontend + backend on Vercel)
 
-This guide deploys the app as two pieces on free tiers:
+This guide deploys the whole app on a single Vercel project:
 
-- **Frontend** (`@workspace/inbox-ai`, a static React build) → **GitHub Pages**
-- **Backend** (`@workspace/api-server`, Express) → **Vercel** serverless function
+- **Frontend** (`@workspace/inbox-ai`, a static React build) → served by Vercel as static files
+- **Backend** (`@workspace/api-server`, Express) → Vercel serverless function under `/api`
 - **Database** (Postgres for users + sessions) → **Neon**
 
-> Replit keeps working exactly as before. Every change below is gated behind
-> environment variables that are unset on Replit, so the existing same-origin
-> cookie login is untouched.
+Because the frontend and the API share one Vercel origin, the app runs in
+**same-origin mode**: a normal session cookie is used for auth — no bearer
+token, no `VITE_API_BASE_URL`, no cross-origin CORS. (Replit's all-in-one
+deployment keeps working exactly as before; all of this is env-gated.)
 
-## How auth works across two domains
+## How it fits together
 
-The frontend (`username.github.io`) and backend (`your-backend.vercel.app`) are
-on different origins, so a session cookie can't be shared between them (browsers
-block third-party cookies). Instead:
-
-1. The Google login is a normal full-page redirect to the **backend**, so the
-   session cookie works during the OAuth handshake (it's first-party there).
-2. After login, the backend issues a signed bearer token and redirects back to
-   the frontend with the token in the URL fragment (`#token=...`).
-3. The frontend stores the token in `localStorage` and sends it as
-   `Authorization: Bearer <token>` on every API call.
-
-You don't need to enable third-party cookies anywhere.
+- `vercel.json` builds both pieces:
+  - `build:vercel` esbuilds the Express app into `artifacts/api-server/dist/vercel.mjs`,
+    which `api/index.mjs` re-exports as the serverless function.
+  - `vite build` (with `BASE_PATH=/`) produces the static SPA into
+    `artifacts/inbox-ai/dist/public`, which Vercel serves as `outputDirectory`.
+- Rewrites:
+  - `/api/(.*)` → the serverless function.
+  - everything else → `/index.html` (SPA client-side routing fallback).
 
 ---
 
@@ -41,14 +38,12 @@ backend runs, so there's no manual migration step.
 > If you want to pre-create the schema, run locally with `DATABASE_URL` pointed
 > at Neon: `pnpm --filter @workspace/db run push`.
 
-## 2. Deploy the backend (Vercel)
+## 2. Deploy on Vercel
 
 1. Push this repository to GitHub.
 2. At https://vercel.com, **Add New → Project** and import the repo.
-3. **Important — set the Root Directory to the repository root** (leave it as
-   the repo root, do not point it at a subfolder). The included `vercel.json`
-   builds the backend bundle with
-   `pnpm --filter @workspace/api-server run build:vercel`.
+3. **Leave the Root Directory at the repository root** (do not point it at a
+   subfolder). The included `vercel.json` drives the build and routing.
 4. Add these **Environment Variables** (Production):
 
    | Name | Value |
@@ -58,15 +53,18 @@ backend runs, so there's no manual migration step.
    | `GOOGLE_CLIENT_ID` | from Google Cloud Console |
    | `GOOGLE_CLIENT_SECRET` | from Google Cloud Console |
    | `DEEPSEEK_API_KEY` | your DeepSeek API key |
-   | `API_PUBLIC_URL` | your Vercel URL, e.g. `https://your-backend.vercel.app` |
-   | `WEB_APP_URL` | your Pages URL, e.g. `https://username.github.io/repo-name` |
+   | `API_PUBLIC_URL` | your Vercel URL, e.g. `https://ai-email-clerk.vercel.app` |
 
-   - `API_PUBLIC_URL` must match the deployed backend domain — it's used to build
-     the Google OAuth redirect URI.
-   - `WEB_APP_URL` enables cross-origin mode (CORS + token redirect). Set it to
-     the full frontend URL **including** the `/repo-name` path.
+   - `API_PUBLIC_URL` must match the deployed domain — it's used to build the
+     Google OAuth redirect URI. Use your stable production domain (the
+     `*.vercel.app` alias or your custom domain), not a per-deploy preview URL.
+   - **Do NOT set `WEB_APP_URL`** — leaving it unset keeps the app in
+     same-origin cookie mode. Setting it would switch on cross-origin
+     bearer-token auth, which you don't need here.
+   - **Do NOT set `VITE_API_BASE_URL`** — the build forces it empty so the SPA
+     calls the API with relative `/api` paths on the same origin.
 
-5. Deploy. Note the resulting backend URL (e.g. `https://your-backend.vercel.app`).
+5. Deploy. Note the resulting URL (e.g. `https://ai-email-clerk.vercel.app`).
    If it differs from what you guessed, update `API_PUBLIC_URL` and redeploy.
 
 > First request after idle may be slow (serverless cold start). Sessions live in
@@ -78,70 +76,42 @@ In https://console.cloud.google.com → **APIs & Services → Credentials**, edi
 your OAuth 2.0 Client and add an **Authorized redirect URI**:
 
 ```
-https://your-backend.vercel.app/api/auth/google/callback
+https://ai-email-clerk.vercel.app/api/auth/google/callback
 ```
 
-(Keep your existing Replit redirect URI too if you still use it.)
+(Replace the host with your actual `API_PUBLIC_URL`. Keep your existing Replit
+redirect URI too if you still use it.)
 
 Note: `gmail.modify` is a restricted scope. Until your app is verified by
 Google, only accounts listed as **Test users** can sign in, and unverified-app
 refresh tokens expire after 7 days.
 
-## 4. Deploy the frontend (GitHub Pages)
+## 4. Verify
 
-1. In your GitHub repo → **Settings → Pages**, set **Source = GitHub Actions**.
-2. In **Settings → Secrets and variables → Actions → Variables**, add a
-   repository **variable**:
-   - `VITE_API_BASE_URL` = your backend URL, e.g. `https://your-backend.vercel.app`
-3. **Create the GitHub Actions workflow via the GitHub web UI.** The workflow
-   content lives in this repo at **`.github/deploy-pages.yml`** (deliberately
-   *not* under `.github/workflows/`). Most Git tokens — including Replit's —
-   cannot push files into `.github/workflows/` without a special `workflow`
-   permission scope, and the push gets rejected. To work around that:
-   - On GitHub: **Add file → Create new file**
-   - Name it exactly `.github/workflows/deploy-pages.yml`
-   - Copy the contents of `.github/deploy-pages.yml` (skip the leading comment
-     block) into it
-   - **Commit directly to `main`**
-
-   The workflow then runs on every push to `main`, building the frontend with
-   `BASE_PATH=/<repo-name>/` and `VITE_API_BASE_URL` (from the variable above)
-   and publishing `artifacts/inbox-ai/dist/public` to Pages.
-4. After the first successful run, your app is live at
-   `https://username.github.io/repo-name/`.
-
-## 5. Verify
-
-1. Open `https://username.github.io/repo-name/`.
-2. Click **Continue with Google** → you're sent to the Vercel backend → Google →
-   back to the frontend, now signed in.
+1. Open your Vercel URL, e.g. `https://ai-email-clerk.vercel.app/`.
+2. Click **Continue with Google** → you're sent to Google → back to the app,
+   now signed in (via the same-origin session cookie).
 3. Confirm the inbox, labels, and AI features load.
 
-If login bounces back to the login screen, re-check that `WEB_APP_URL` (backend)
-and `VITE_API_BASE_URL` (frontend) point at the right URLs and that the Google
-redirect URI matches `API_PUBLIC_URL`.
+If login bounces back to the login screen, re-check that `API_PUBLIC_URL`
+matches the deployed domain and that the Google redirect URI matches it exactly.
 
 ---
 
 ## Environment variable reference
 
-**Backend (Vercel):** `DATABASE_URL`, `SESSION_SECRET`, `GOOGLE_CLIENT_ID`,
-`GOOGLE_CLIENT_SECRET`, `DEEPSEEK_API_KEY`, `API_PUBLIC_URL`, `WEB_APP_URL`.
+**Vercel (Production):** `DATABASE_URL`, `SESSION_SECRET`, `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, `DEEPSEEK_API_KEY`, `API_PUBLIC_URL`.
 
-**Frontend (GitHub Actions):** `VITE_API_BASE_URL` (the only one you set;
-`BASE_PATH` and `PORT` are provided by the workflow).
+Leave `WEB_APP_URL` and `VITE_API_BASE_URL` **unset** for the single-origin
+Vercel deployment.
 
 ## Notes & limitations
 
-- This split deployment **cannot be tested from Replit** — it depends on the
-  external GitHub/Vercel/Neon services and their environment variables. Replit
-  continues to run the all-in-one version.
 - Vercel free functions have execution-time limits; very large bulk AI labeling
   runs could hit the 30s `maxDuration`. Reduce batch sizes if needed.
-- **Token security:** in cross-origin mode the API call auth uses a signed bearer
-  token (7-day expiry) stored in the browser's `localStorage`. Logout revokes all
-  of a user's outstanding tokens server-side (a per-user version is bumped and
-  checked on every request). Note that a GitHub Pages *project page*
-  (`username.github.io/repo`) shares the `username.github.io` origin with your
-  other repos' pages, so `localStorage` is readable by any page on that origin.
-  For stronger isolation, host the frontend on its own custom domain.
+- Auth uses a same-origin, HTTP-only session cookie (`secure`, `sameSite=lax`)
+  backed by Neon. Logout destroys the session server-side.
+- This single-origin deployment cannot be exercised from Replit (it needs the
+  external Vercel/Neon services and their environment variables). Replit
+  continues to run the all-in-one version.
