@@ -424,6 +424,28 @@ export const SuggestEmailGroupsResponse = zod.array(SuggestEmailGroupsResponseIt
 
 
 /**
+ * Summarizes a scoped set of emails (by view/label, optionally unread-only) into an overview plus per-email one-liners.
+ * @summary AI digest of a set of emails
+ */
+export const DigestEmailsBody = zod.object({
+  "labelId": zod.string().optional().describe('Scope the digest to emails with this label.'),
+  "view": zod.enum(['all', 'unlabeled', 'starred', 'unread']).optional(),
+  "onlyUnread": zod.boolean().optional().describe('Restrict to unread emails.')
+})
+
+export const DigestEmailsResponse = zod.object({
+  "summary": zod.string(),
+  "count": zod.number(),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "subject": zod.string(),
+  "sender": zod.string(),
+  "summary": zod.string()
+}))
+})
+
+
+/**
  * @summary Dashboard statistics
  */
 export const GetStatsResponse = zod.object({

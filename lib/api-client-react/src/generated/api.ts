@@ -24,6 +24,8 @@ import type {
   AutoLabelResult,
   BulkActionInput,
   BulkLabelInput,
+  DigestInput,
+  DigestResult,
   Email,
   EmailGroup,
   EmailLabelInput,
@@ -1449,6 +1451,78 @@ export const useSuggestEmailGroups = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getSuggestEmailGroupsMutationOptions(options));
+    }
+
+export const getDigestEmailsUrl = () => {
+
+
+
+
+  return `/api/ai/digest`
+}
+
+/**
+ * Summarizes a scoped set of emails (by view/label, optionally unread-only) into an overview plus per-email one-liners.
+ * @summary AI digest of a set of emails
+ */
+export const digestEmails = async (digestInput: DigestInput, options?: RequestInit): Promise<DigestResult> => {
+
+  return customFetch<DigestResult>(getDigestEmailsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      digestInput,)
+  }
+);}
+
+
+
+
+export const getDigestEmailsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof digestEmails>>, TError,{data: BodyType<DigestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof digestEmails>>, TError,{data: BodyType<DigestInput>}, TContext> => {
+
+const mutationKey = ['digestEmails'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof digestEmails>>, {data: BodyType<DigestInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  digestEmails(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DigestEmailsMutationResult = NonNullable<Awaited<ReturnType<typeof digestEmails>>>
+    export type DigestEmailsMutationBody = BodyType<DigestInput>
+    export type DigestEmailsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary AI digest of a set of emails
+ */
+export const useDigestEmails = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof digestEmails>>, TError,{data: BodyType<DigestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof digestEmails>>,
+        TError,
+        {data: BodyType<DigestInput>},
+        TContext
+      > => {
+      return useMutation(getDigestEmailsMutationOptions(options));
     }
 
 export const getGetStatsUrl = () => {

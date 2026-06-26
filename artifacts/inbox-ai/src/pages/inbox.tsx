@@ -28,7 +28,7 @@ import {
   Star, Inbox as InboxIcon, Tags, Filter,
   CheckSquare, Sparkles, X, Loader2, Mail, ArrowLeft,
   Archive, Trash2, ShieldAlert, MailOpen, Reply, Forward,
-  PenSquare, Ban,
+  PenSquare, Ban, Sparkles as SparklesIcon,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { LabelBadge } from "@/components/labels/label-badge";
 import { EmailBody } from "@/components/inbox/email-body";
 import { ComposeDialog, ComposeMode } from "@/components/inbox/compose-dialog";
+import { DigestDialog } from "@/components/inbox/digest-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { LabelPicker } from "@/components/labels/label-picker";
 
@@ -81,6 +82,7 @@ export default function InboxPage() {
   const [activeEmailId, setActiveEmailId] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [digestOpen, setDigestOpen] = useState(false);
 
   // Pagination: react-query owns the first page (so it stays cached + is
   // invalidated by label/action mutations); subsequent "load more" pages are
@@ -470,15 +472,27 @@ export default function InboxPage() {
               </Button>
             </div>
           ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 sm:h-8 gap-2 px-3 border-border/60 shadow-none shrink-0"
-              onClick={() => setComposeOpen(true)}
-            >
-              <PenSquare className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Compose</span>
-            </Button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 sm:h-8 gap-2 px-2.5 text-muted-foreground hover:text-foreground"
+                onClick={() => setDigestOpen(true)}
+                title="AI digest of this view"
+              >
+                <SparklesIcon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Digest</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 sm:h-8 gap-2 px-3 border-border/60 shadow-none"
+                onClick={() => setComposeOpen(true)}
+              >
+                <PenSquare className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Compose</span>
+              </Button>
+            </div>
           )}
         </div>
 
@@ -651,6 +665,17 @@ export default function InboxPage() {
         onOpenChange={setComposeOpen}
         mode="compose"
         onSent={() => toast({ title: "Message sent" })}
+      />
+
+      <DigestDialog
+        open={digestOpen}
+        onOpenChange={setDigestOpen}
+        view={view}
+        labelId={labelIdFilter}
+        scopeLabel={
+          activeLabel?.name ??
+          (view === "all" ? "All mail" : VIEWS.find((v) => v.value === view)?.label ?? "Inbox")
+        }
       />
     </div>
   );

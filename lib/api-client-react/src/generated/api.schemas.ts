@@ -215,6 +215,37 @@ export interface EmailGroup {
   emailIds: string[];
 }
 
+export type DigestInputView = typeof DigestInputView[keyof typeof DigestInputView];
+
+
+export const DigestInputView = {
+  all: 'all',
+  unlabeled: 'unlabeled',
+  starred: 'starred',
+  unread: 'unread',
+} as const;
+
+export interface DigestInput {
+  /** Scope the digest to emails with this label. */
+  labelId?: string;
+  view?: DigestInputView;
+  /** Restrict to unread emails. */
+  onlyUnread?: boolean;
+}
+
+export interface DigestItem {
+  id: string;
+  subject: string;
+  sender: string;
+  summary: string;
+}
+
+export interface DigestResult {
+  summary: string;
+  count: number;
+  items: DigestItem[];
+}
+
 export interface LabelStat {
   id: string;
   name: string;

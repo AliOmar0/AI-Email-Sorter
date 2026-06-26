@@ -1,5 +1,9 @@
 import { Router, type IRouter } from "express";
-import { AutoLabelEmailsBody, SuggestEmailGroupsBody } from "@workspace/api-zod";
+import {
+  AutoLabelEmailsBody,
+  SuggestEmailGroupsBody,
+  DigestEmailsBody,
+} from "@workspace/api-zod";
 import { getAIClient, isAIConfigured, AI_MODEL } from "../lib/aiClient";
 import { clientForUser } from "../lib/google";
 import {
@@ -188,6 +192,77 @@ Only include emails from the list above. Skip emails that don't fit any group. J
     return res.json(groups);
   } catch (err) {
     req.log.error({ err }, "group-suggestions failed");
+    return res.status(502).json({ error: "AI request failed" });
+  }
+});
+
+router.post("/ai/digest", async (req, res) => {
+  if (!isAIConfigured())
+    return res.status(503).json({ error: "AI provider not configured" });
+
+  const auth = clientForUser(req.user!);
+  const body = DigestEmailsBody.parse(req.body);
+
+  // Scope the digest to the requested view/label, optionally unread-only.
+  const search = body.onlyUnread ? "is:unread" : undefined;
+  const emails = await listEmails(
+    auth,
+    { labelId: body.labelId, view: body.view, search },
+    25,
+  );
+
+  if (emails.length === 0) {
+    return res.json({ summary: "No emails to summarize.", count: 0, items: [] });
+  }
+
+  const list = emails
+    .map(
+      (e, i) =>
+        `[${i}] id:${e.id} | from:${e.sender} <${e.senderEmail}> | subject:${e.subject}\n${(e.body || e.snippet).slice(0, 500)}`,
+    )
+    .join("\n\n");
+
+  const prompt = `You are an assistant that summarizes a batch of emails into a useful digest.
+
+Emails:
+${list}
+
+Return a JSON object:
+{"summary": "<2-4 sentence overview of the whole batch: themes, anything urgent or needing action>", "items": [{"id": "<email id>", "summary": "<one concise sentence>"}]}
+Include an item for every email above, in the same order. Respond with JSON only.`;
+
+  try {
+    const completion = await getAIClient().chat.completions.create({
+      model: AI_MODEL,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const content = completion.choices[0]?.message?.content ?? "{}";
+    const parsed = extractJson(content) as {
+      summary?: string;
+      items?: Array<{ id?: string; summary?: string }>;
+    };
+
+    const byId = new Map(emails.map((e) => [e.id, e]));
+    const items = (parsed.items ?? [])
+      .map((it) => {
+        const email = it.id != null ? byId.get(String(it.id)) : undefined;
+        if (!email) return null;
+        return {
+          id: email.id,
+          subject: email.subject,
+          sender: email.sender,
+          summary: it.summary ?? "",
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+
+    return res.json({
+      summary: parsed.summary ?? "",
+      count: emails.length,
+      items,
+    });
+  } catch (err) {
+    req.log.error({ err }, "digest failed");
     return res.status(502).json({ error: "AI request failed" });
   }
 });

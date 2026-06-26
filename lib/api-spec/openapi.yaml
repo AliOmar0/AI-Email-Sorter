@@ -419,6 +419,26 @@ paths:
                 items:
                   $ref: "#/components/schemas/EmailGroup"
 
+  /ai/digest:
+    post:
+      operationId: digestEmails
+      tags: [ai]
+      summary: AI digest of a set of emails
+      description: Summarizes a scoped set of emails (by view/label, optionally unread-only) into an overview plus per-email one-liners.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DigestInput"
+      responses:
+        "200":
+          description: The digest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DigestResult"
+
   /stats:
     get:
       operationId: getStats
@@ -757,6 +777,45 @@ components:
           type: array
           items:
             type: string
+
+    DigestInput:
+      type: object
+      properties:
+        labelId:
+          type: string
+          description: Scope the digest to emails with this label.
+        view:
+          type: string
+          enum: [all, unlabeled, starred, unread]
+        onlyUnread:
+          type: boolean
+          description: Restrict to unread emails.
+
+    DigestItem:
+      type: object
+      required: [id, subject, sender, summary]
+      properties:
+        id:
+          type: string
+        subject:
+          type: string
+        sender:
+          type: string
+        summary:
+          type: string
+
+    DigestResult:
+      type: object
+      required: [summary, count, items]
+      properties:
+        summary:
+          type: string
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DigestItem"
 
     LabelStat:
       type: object
