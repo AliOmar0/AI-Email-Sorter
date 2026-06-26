@@ -121,13 +121,14 @@ router.post("/ai/auto-label", async (req, res) => {
 
   // Cap the unlabeled working set: each email is a separate AI call, so we
   // bound cost/latency rather than processing an entire mailbox at once.
+  const MAX_PER_REQUEST = 40;
   let targets: ApiEmail[];
   if (body.emailIds && body.emailIds.length > 0) {
     targets = await Promise.all(
-      body.emailIds.slice(0, 40).map((id) => getEmail(auth, id)),
+      body.emailIds.slice(0, MAX_PER_REQUEST).map((id) => getEmail(auth, id)),
     );
   } else {
-    targets = await listEmails(auth, { view: "unlabeled" }, 40);
+    targets = await listEmails(auth, { view: "unlabeled" }, MAX_PER_REQUEST);
   }
 
   const labelList = labels.map((l) => `- ${l.name} (id: ${l.id})`).join("\n");
@@ -170,15 +171,26 @@ Respond with a JSON object: {"labelIds": ["<id>", ...]}. JSON only.`;
     }
   };
 
+  // Each email is a separate, slow AI call. On serverless the whole request
+  // must finish within the function's maxDuration (vercel.json), so we stop
+  // launching new work once a wall-clock budget is spent and report how many
+  // targets were left unprocessed — the client resumes with another request.
+  const startedAt = Date.now();
+  const BUDGET_MS = 22_000; // safely under the 30s serverless maxDuration
   const concurrency = 3;
+  let processed = 0;
   for (let i = 0; i < targets.length; i += concurrency) {
-    await Promise.all(targets.slice(i, i + concurrency).map(runOne));
+    if (Date.now() - startedAt > BUDGET_MS) break;
+    const batch = targets.slice(i, i + concurrency);
+    await Promise.all(batch.map(runOne));
+    processed += batch.length;
   }
 
   return res.json({
-    processed: targets.length,
+    processed,
     labeled: items.filter((i) => i.appliedLabelIds.length > 0).length,
     items,
+    remaining: targets.length - processed,
   });
 });
 

@@ -7,7 +7,8 @@ import {
   useGetStats,
   getGetStatsQueryKey,
   getListEmailsQueryKey,
-  getListLabelsQueryKey
+  getListLabelsQueryKey,
+  listEmails
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Sparkles, BrainCircuit, Wand2, Layers, CheckCircle2, Loader2, ArrowRight } from "lucide-react";
@@ -29,18 +30,44 @@ export default function AIStudioPage() {
 
   const [activeTab, setActiveTab] = useState<"overview" | "results">("overview");
   const [autoLabelResult, setAutoLabelResult] = useState<any>(null);
+  const [isAutoLabeling, setIsAutoLabeling] = useState(false);
 
   const handleRunAutoLabel = async () => {
+    setIsAutoLabeling(true);
     try {
-      const result = await autoLabel.mutateAsync({ data: {} });
-      setAutoLabelResult(result);
+      // Enumerate the unlabeled emails up front, then process them in small
+      // batches. Each batch is its own request, so no single serverless
+      // invocation runs long enough to hit the gateway timeout (504). DeepSeek
+      // calls are slow, so a whole-mailbox pass in one request times out.
+      const unlabeled = await listEmails({ view: "unlabeled" });
+      const ids = unlabeled.map((e) => e.id);
+
+      if (ids.length === 0) {
+        toast({ title: "Nothing to label", description: "No unlabeled emails found." });
+        return;
+      }
+
+      const BATCH_SIZE = 6;
+      let processed = 0;
+      let labeled = 0;
+      const items: any[] = [];
+
+      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+        const chunk = ids.slice(i, i + BATCH_SIZE);
+        const result: any = await autoLabel.mutateAsync({ data: { emailIds: chunk } });
+        processed += result?.processed ?? chunk.length;
+        labeled += result?.labeled ?? 0;
+        if (Array.isArray(result?.items)) items.push(...result.items);
+      }
+
+      setAutoLabelResult({ processed, labeled, items });
       setActiveTab("results");
       queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getListLabelsQueryKey() });
       toast({
         title: "Auto-labeling complete",
-        description: `Processed ${result.processed} emails, labeled ${result.labeled}.`
+        description: `Processed ${processed} emails, labeled ${labeled}.`
       });
     } catch (e: any) {
       // Surface the actual server reason (e.g. "AI provider not configured")
@@ -51,6 +78,8 @@ export default function AIStudioPage() {
         e?.message ??
         "Auto-labeling failed.";
       toast({ title: "Auto-labeling failed", description, variant: "destructive" });
+    } finally {
+      setIsAutoLabeling(false);
     }
   };
 
@@ -140,9 +169,9 @@ export default function AIStudioPage() {
                 <Button 
                   className="w-full h-12 rounded-xl text-base font-medium shadow-sm" 
                   onClick={handleRunAutoLabel}
-                  disabled={autoLabel.isPending || (stats?.unlabeledCount === 0)}
+                  disabled={isAutoLabeling || autoLabel.isPending || (stats?.unlabeledCount === 0)}
                 >
-                  {autoLabel.isPending ? (
+                  {(isAutoLabeling || autoLabel.isPending) ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Analyzing Inbox...</>
                   ) : (
                     <><Wand2 className="w-4 h-4 mr-2" /> Run Auto-Label Now</>
