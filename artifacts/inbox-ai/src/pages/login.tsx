@@ -1,6 +1,7 @@
 import { Sparkles, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiUrl } from "@/lib/api-base";
+import { ShaderBackground } from "@/components/shader-background";
 
 export default function LoginPage() {
   const handleLogin = () => {
@@ -11,6 +12,12 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-[100dvh] w-full flex-col bg-background relative overflow-hidden items-center justify-center font-sans text-foreground">
+      {/* Dynamic GPU shader background (degrades to the static blobs below if
+          WebGPU/the library is unavailable). */}
+      <ShaderBackground className="z-0 opacity-70" />
+      {/* Scrim to keep the brand text and card readable over the shader. */}
+      <div className="absolute inset-0 z-0 bg-background/50 pointer-events-none" />
+
       {/* Abstract Background Elements */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-[30%] -right-[10%] w-[70%] h-[70%] rounded-full bg-primary/5 blur-[120px]" />
