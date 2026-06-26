@@ -33,4 +33,5 @@ export * from './sendEmailResult';
 export * from './stats';
 export * from './unsubscribeResult';
 export * from './unsubscribeResultStatus';
+export * from './updateSettingsInput';
 export * from './user';

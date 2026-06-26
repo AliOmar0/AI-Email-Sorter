@@ -86,9 +86,17 @@ export async function ensureUsersTable(): Promise<void> {
       "refresh_token" text,
       "token_expiry" timestamp with time zone,
       "token_version" integer NOT NULL DEFAULT 0,
+      "auto_label_enabled" boolean NOT NULL DEFAULT false,
+      "auto_label_cursor" timestamp with time zone,
       "created_at" timestamp with time zone NOT NULL DEFAULT now(),
       "updated_at" timestamp with time zone NOT NULL DEFAULT now()
     );
+    -- Additive columns for already-provisioned databases (drizzle-kit push is
+    -- avoided here because it wants to DROP the runtime-managed session table).
+    ALTER TABLE "users"
+      ADD COLUMN IF NOT EXISTS "auto_label_enabled" boolean NOT NULL DEFAULT false;
+    ALTER TABLE "users"
+      ADD COLUMN IF NOT EXISTS "auto_label_cursor" timestamp with time zone;
   `);
 }
 

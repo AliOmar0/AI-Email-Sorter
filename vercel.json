@@ -8,6 +8,9 @@
       "maxDuration": 30
     }
   },
+  "crons": [
+    { "path": "/api/cron/auto-label", "schedule": "*/30 * * * *" }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/(.*)", "destination": "/index.html" }

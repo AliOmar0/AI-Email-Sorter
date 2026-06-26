@@ -24,7 +24,8 @@ export const GetCurrentUserResponse = zod.object({
   "id": zod.number(),
   "email": zod.string(),
   "name": zod.string(),
-  "picture": zod.string().nullish()
+  "picture": zod.string().nullish(),
+  "autoLabelEnabled": zod.boolean().optional().describe('Whether background auto-labeling is enabled for this user.')
 })
 
 
@@ -438,6 +439,23 @@ export const GetStatsResponse = zod.object({
   "color": zod.string().nullable(),
   "count": zod.number()
 }))
+})
+
+
+/**
+ * Update preferences such as the background auto-labeling opt-in.
+ * @summary Update per-user settings
+ */
+export const UpdateSettingsBody = zod.object({
+  "autoLabelEnabled": zod.boolean().optional()
+})
+
+export const UpdateSettingsResponse = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "picture": zod.string().nullish(),
+  "autoLabelEnabled": zod.boolean().optional().describe('Whether background auto-labeling is enabled for this user.')
 })
 
 

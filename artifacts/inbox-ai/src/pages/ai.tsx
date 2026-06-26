@@ -8,12 +8,16 @@ import {
   getGetStatsQueryKey,
   getListEmailsQueryKey,
   getListLabelsQueryKey,
+  useGetCurrentUser,
+  getGetCurrentUserQueryKey,
+  useUpdateSettings,
   listEmails
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Sparkles, BrainCircuit, Wand2, Layers, CheckCircle2, Loader2, ArrowRight } from "lucide-react";
+import { Sparkles, BrainCircuit, Wand2, Layers, CheckCircle2, Loader2, ArrowRight, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { LabelBadge } from "@/components/labels/label-badge";
@@ -22,15 +26,44 @@ export default function AIStudioPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: stats } = useGetStats({ query: { queryKey: getGetStatsQueryKey() } });
+  const { data: me } = useGetCurrentUser({ query: { queryKey: getGetCurrentUserQueryKey() } });
 
   const suggestGroups = useSuggestEmailGroups();
   const autoLabel = useAutoLabelEmails();
   const createLabel = useCreateLabel();
   const bulkLabel = useBulkLabelEmails();
+  const updateSettings = useUpdateSettings();
 
   const [activeTab, setActiveTab] = useState<"overview" | "results">("overview");
   const [autoLabelResult, setAutoLabelResult] = useState<any>(null);
   const [isAutoLabeling, setIsAutoLabeling] = useState(false);
+
+  const autoLabelEnabled = me?.autoLabelEnabled ?? false;
+
+  const handleToggleAutoLabel = (next: boolean) => {
+    // Optimistic so the switch responds instantly; reconcile on error.
+    queryClient.setQueryData<any>(getGetCurrentUserQueryKey(), (old: any) =>
+      old ? { ...old, autoLabelEnabled: next } : old,
+    );
+    updateSettings.mutate(
+      { data: { autoLabelEnabled: next } },
+      {
+        onSuccess: () =>
+          toast({
+            title: next ? "Background labeling on" : "Background labeling off",
+            description: next
+              ? "New unlabeled mail will be labeled automatically."
+              : "Automatic labeling has been disabled.",
+          }),
+        onError: () => {
+          queryClient.setQueryData<any>(getGetCurrentUserQueryKey(), (old: any) =>
+            old ? { ...old, autoLabelEnabled: !next } : old,
+          );
+          toast({ title: "Couldn't update setting", variant: "destructive" });
+        },
+      },
+    );
+  };
 
   const handleRunAutoLabel = async () => {
     setIsAutoLabeling(true);
@@ -141,6 +174,29 @@ export default function AIStudioPage() {
             </div>
           )}
         </div>
+
+        {activeTab === "overview" && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-border/60 bg-muted/30 p-5 sm:p-6">
+            <div className="flex items-start gap-4 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-foreground/5 border border-border/50 flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5 text-foreground/70" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm sm:text-base font-semibold text-foreground">Automatic background labeling</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-xl">
+                  When on, new unlabeled mail is labeled for you on a schedule — no need to run Magic Auto-Label manually.
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={autoLabelEnabled}
+              onCheckedChange={handleToggleAutoLabel}
+              disabled={updateSettings.isPending}
+              aria-label="Toggle automatic background labeling"
+              className="shrink-0"
+            />
+          </div>
+        )}
 
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">

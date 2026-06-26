@@ -144,6 +144,7 @@ router.get("/auth/me", async (req, res, next) => {
       email: user.email,
       name: user.name,
       picture: user.picture,
+      autoLabelEnabled: user.autoLabelEnabled,
     });
   } catch (err) {
     next(err);

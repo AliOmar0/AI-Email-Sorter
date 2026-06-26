@@ -54,6 +54,7 @@ backend runs, so there's no manual migration step.
    | `GOOGLE_CLIENT_SECRET` | from Google Cloud Console |
    | `DEEPSEEK_API_KEY` | your DeepSeek API key |
    | `API_PUBLIC_URL` | your Vercel URL, e.g. `https://ai-email-clerk.vercel.app` |
+   | `CRON_SECRET` | a long random string (e.g. `openssl rand -hex 32`) — enables the scheduled background auto-labeling cron |
 
    - `API_PUBLIC_URL` must match the deployed domain — it's used to build the
      Google OAuth redirect URI. Use your stable production domain (the
@@ -101,10 +102,19 @@ matches the deployed domain and that the Google redirect URI matches it exactly.
 ## Environment variable reference
 
 **Vercel (Production):** `DATABASE_URL`, `SESSION_SECRET`, `GOOGLE_CLIENT_ID`,
-`GOOGLE_CLIENT_SECRET`, `DEEPSEEK_API_KEY`, `API_PUBLIC_URL`.
+`GOOGLE_CLIENT_SECRET`, `DEEPSEEK_API_KEY`, `API_PUBLIC_URL`, `CRON_SECRET`.
 
 Leave `WEB_APP_URL` and `VITE_API_BASE_URL` **unset** for the single-origin
 Vercel deployment.
+
+### Background auto-labeling (cron)
+
+`vercel.json` schedules `GET /api/cron/auto-label` every 30 minutes. Vercel Cron
+automatically sends `Authorization: Bearer $CRON_SECRET`, and the endpoint
+refuses to run unless `CRON_SECRET` is set and matches. It processes only users
+who have opted in (AI Studio → "Automatic background labeling") and still have a
+valid refresh token, labeling recent unlabeled mail since a per-user watermark.
+If `CRON_SECRET` is unset the endpoint returns 503 and the feature is off.
 
 ## Notes & limitations
 

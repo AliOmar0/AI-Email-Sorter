@@ -10,6 +10,12 @@ import {
   type ApiEmail,
   type ApiLabel,
 } from "../lib/gmail";
+import {
+  applyAutoLabels,
+  emailContext,
+  extractJson,
+  userLabels,
+} from "../lib/aiLabeling";
 
 const router: IRouter = Router();
 
@@ -30,24 +36,6 @@ function pickColor(seed: string): string {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
   return PALETTE[h % PALETTE.length];
-}
-
-function emailContext(e: ApiEmail): string {
-  const body = e.body.length > 1200 ? e.body.slice(0, 1200) : e.body;
-  return `From: ${e.sender} <${e.senderEmail}>\nSubject: ${e.subject}\nBody: ${body}`;
-}
-
-function extractJson(text: string): unknown {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const raw = fenced ? fenced[1] : text;
-  const start = raw.search(/[[{]/);
-  if (start === -1) return JSON.parse(raw);
-  return JSON.parse(raw.slice(start));
-}
-
-// Only custom (non-system) labels are candidates for AI organizing.
-function userLabels(labels: ApiLabel[]): ApiLabel[] {
-  return labels.filter((l) => !l.isSystem);
 }
 
 router.post("/ai/suggest-labels/:id", async (req, res) => {
@@ -117,7 +105,7 @@ router.post("/ai/auto-label", async (req, res) => {
   const body = AutoLabelEmailsBody.parse(req.body);
   const labels = userLabels(await listLabels(auth));
   if (labels.length === 0)
-    return res.json({ processed: 0, labeled: 0, items: [] });
+    return res.json({ processed: 0, labeled: 0, items: [], remaining: 0 });
 
   // Cap the unlabeled working set: each email is a separate AI call, so we
   // bound cost/latency rather than processing an entire mailbox at once.
@@ -131,67 +119,13 @@ router.post("/ai/auto-label", async (req, res) => {
     targets = await listEmails(auth, { view: "unlabeled" }, MAX_PER_REQUEST);
   }
 
-  const labelList = labels.map((l) => `- ${l.name} (id: ${l.id})`).join("\n");
-  const validIds = new Set(labels.map((l) => l.id));
-  const items: { emailId: string; appliedLabelIds: string[] }[] = [];
-
-  const runOne = async (email: ApiEmail) => {
-    const prompt = `Classify this email using ONLY the labels below. Pick the 1-2 most fitting label ids, or none if nothing fits.
-
-Labels:
-${labelList}
-
-Email:
-${emailContext(email)}
-
-Respond with a JSON object: {"labelIds": ["<id>", ...]}. JSON only.`;
-    try {
-      const completion = await getAIClient().chat.completions.create({
-        model: AI_MODEL,
-        messages: [{ role: "user", content: prompt }],
-      });
-      const content = completion.choices[0]?.message?.content ?? "{}";
-      const parsed = extractJson(content) as { labelIds?: string[] };
-      const ids = (parsed.labelIds ?? [])
-        .map((x) => String(x))
-        .filter((x) => validIds.has(x))
-        .slice(0, 2);
-      if (ids.length > 0) {
-        const existing = email.labels
-          .filter((l) => !l.isSystem)
-          .map((l) => l.id);
-        await setEmailLabels(auth, email.id, [
-          ...new Set([...existing, ...ids]),
-        ]);
-      }
-      items.push({ emailId: email.id, appliedLabelIds: ids });
-    } catch (err) {
-      req.log.error({ err, emailId: email.id }, "auto-label item failed");
-      items.push({ emailId: email.id, appliedLabelIds: [] });
-    }
-  };
-
-  // Each email is a separate, slow AI call. On serverless the whole request
-  // must finish within the function's maxDuration (vercel.json), so we stop
-  // launching new work once a wall-clock budget is spent and report how many
-  // targets were left unprocessed — the client resumes with another request.
-  const startedAt = Date.now();
-  const BUDGET_MS = 22_000; // safely under the 30s serverless maxDuration
-  const concurrency = 3;
-  let processed = 0;
-  for (let i = 0; i < targets.length; i += concurrency) {
-    if (Date.now() - startedAt > BUDGET_MS) break;
-    const batch = targets.slice(i, i + concurrency);
-    await Promise.all(batch.map(runOne));
-    processed += batch.length;
-  }
-
-  return res.json({
-    processed,
-    labeled: items.filter((i) => i.appliedLabelIds.length > 0).length,
-    items,
-    remaining: targets.length - processed,
+  // Shared with the scheduled cron. The budget stays safely under the serverless
+  // maxDuration; the client resumes with another request using `remaining`.
+  const outcome = await applyAutoLabels(auth, targets, labels, {
+    budgetMs: 22_000,
+    concurrency: 3,
   });
+  return res.json(outcome);
 });
 
 router.post("/ai/group-suggestions", async (req, res) => {

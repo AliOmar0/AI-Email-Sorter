@@ -12,4 +12,6 @@ export interface User {
   name: string;
   /** @nullable */
   picture?: string | null;
+  /** Whether background auto-labeling is enabled for this user. */
+  autoLabelEnabled?: boolean;
 }

@@ -1,4 +1,4 @@
-import { integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -14,6 +14,11 @@ export const usersTable = pgTable("users", {
   // Bumped on logout to revoke all previously-issued cross-origin bearer
   // tokens (see lib/token.ts). Session-cookie auth ignores this.
   tokenVersion: integer("token_version").notNull().default(0),
+  // Opt-in: when true, the scheduled cron auto-labels the user's new unlabeled
+  // mail. autoLabelCursor is a watermark (newest message internalDate already
+  // considered) so each run only processes mail that arrived since the last.
+  autoLabelEnabled: boolean("auto_label_enabled").notNull().default(false),
+  autoLabelCursor: timestamp("auto_label_cursor", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
