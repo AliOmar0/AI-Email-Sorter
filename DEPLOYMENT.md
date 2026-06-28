@@ -109,21 +109,21 @@ Vercel deployment.
 
 ### Background auto-labeling (cron)
 
-`vercel.json` schedules `GET /api/cron/auto-label` every 30 minutes. Vercel Cron
-automatically sends `Authorization: Bearer $CRON_SECRET`, and the endpoint
-refuses to run unless `CRON_SECRET` is set and matches. It processes only users
-who have opted in (AI Studio → "Automatic background labeling") and still have a
-valid refresh token, labeling recent unlabeled mail since a per-account
-watermark. If `CRON_SECRET` is unset the endpoint returns 503 and the feature is
-off.
+`vercel.json` schedules `GET /api/cron/auto-label` once per day at 11:00 UTC,
+which is compatible with Vercel Hobby cron limits. Vercel Cron automatically
+sends `Authorization: Bearer $CRON_SECRET`, and the endpoint refuses to run
+unless `CRON_SECRET` is set and matches. It processes only users who have opted
+in (AI Studio → "Automatic background labeling") and still have a valid refresh
+token, labeling recent unlabeled mail since a per-account watermark. If
+`CRON_SECRET` is unset the endpoint returns 503 and the feature is off.
 
 ### Daily label digests (cron)
 
-`vercel.json` also schedules `GET /api/cron/daily-digest` once per day. It uses
-the same `CRON_SECRET` gate and processes only users who have opted in (AI
-Studio → "Daily label digest"). For each connected account, it summarizes unread
-mail grouped by user labels since that account's digest watermark, then emails a
-single plain-text digest to the account itself.
+`vercel.json` also schedules `GET /api/cron/daily-digest` once per day at 12:00
+UTC. It uses the same `CRON_SECRET` gate and processes only users who have opted
+in (AI Studio → "Daily label digest"). For each connected account, it summarizes
+unread mail grouped by user labels since that account's digest watermark, then
+emails a single plain-text digest to the account itself.
 
 ## Notes & limitations
 
