@@ -20,8 +20,13 @@ import {
   extractJson,
   userLabels,
 } from "../lib/aiLabeling";
+import { asyncRoute } from "../middlewares/asyncRoute";
 
 const router: IRouter = Router();
+
+function param(value: string | string[]): string {
+  return Array.isArray(value) ? value[0] : value;
+}
 
 const PALETTE = [
   "#6366f1",
@@ -42,12 +47,12 @@ function pickColor(seed: string): string {
   return PALETTE[h % PALETTE.length];
 }
 
-router.post("/ai/suggest-labels/:id", async (req, res) => {
+router.post("/ai/suggest-labels/:id", asyncRoute("ai.suggestLabels", async (req, res) => {
   if (!isAIConfigured())
     return res.status(503).json({ error: "AI provider not configured" });
 
   const auth = clientForAccount(req.account!);
-  const email = await getEmail(auth, req.params.id);
+  const email = await getEmail(auth, param(req.params.id));
   const labels = userLabels(await listLabels(auth));
 
   const labelList = labels.map((l) => `- ${l.name} (id: ${l.id})`).join("\n");
@@ -99,9 +104,9 @@ Prefer existing labels when they fit. Only propose a new label when nothing exis
     req.log.error({ err }, "suggest-labels failed");
     return res.status(502).json({ error: "AI request failed" });
   }
-});
+}));
 
-router.post("/ai/auto-label", async (req, res) => {
+router.post("/ai/auto-label", asyncRoute("ai.autoLabel", async (req, res) => {
   if (!isAIConfigured())
     return res.status(503).json({ error: "AI provider not configured" });
 
@@ -130,9 +135,9 @@ router.post("/ai/auto-label", async (req, res) => {
     concurrency: 3,
   });
   return res.json(outcome);
-});
+}));
 
-router.post("/ai/group-suggestions", async (req, res) => {
+router.post("/ai/group-suggestions", asyncRoute("ai.groupSuggestions", async (req, res) => {
   if (!isAIConfigured())
     return res.status(503).json({ error: "AI provider not configured" });
 
@@ -194,9 +199,9 @@ Only include emails from the list above. Skip emails that don't fit any group. J
     req.log.error({ err }, "group-suggestions failed");
     return res.status(502).json({ error: "AI request failed" });
   }
-});
+}));
 
-router.post("/ai/digest", async (req, res) => {
+router.post("/ai/digest", asyncRoute("ai.digest", async (req, res) => {
   if (!isAIConfigured())
     return res.status(503).json({ error: "AI provider not configured" });
 
@@ -265,6 +270,6 @@ Include an item for every email above, in the same order. Respond with JSON only
     req.log.error({ err }, "digest failed");
     return res.status(502).json({ error: "AI request failed" });
   }
-});
+}));
 
 export default router;

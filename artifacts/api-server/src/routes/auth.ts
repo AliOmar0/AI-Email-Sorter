@@ -199,6 +199,7 @@ router.get("/auth/me", async (req, res, next) => {
       name: user.name,
       picture: user.picture,
       autoLabelEnabled: user.autoLabelEnabled,
+      dailyDigestEnabled: user.dailyDigestEnabled,
     });
   } catch (err) {
     next(err);

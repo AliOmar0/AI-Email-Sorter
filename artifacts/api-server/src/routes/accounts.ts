@@ -7,23 +7,24 @@ import {
   getAccountForUser,
   toApiAccount,
 } from "../lib/accounts";
+import { asyncRoute } from "../middlewares/asyncRoute";
 
 const router: IRouter = Router();
 
 // List the signed-in user's connected accounts, flagging the active one.
-router.get("/accounts", async (req, res, next) => {
-  try {
+router.get(
+  "/accounts",
+  asyncRoute("accounts.list", async (req, res) => {
     const accounts = await listAccountsForUser(req.user!.id);
     res.json(accounts.map((a) => toApiAccount(a, req.account?.id)));
-  } catch (err) {
-    next(err);
-  }
-});
+  }),
+);
 
 // Switch the active account (persisted in the session for cookie mode; clients
 // in bearer mode additionally send the choice via the X-Account-Id header).
-router.post("/accounts/switch", async (req, res, next) => {
-  try {
+router.post(
+  "/accounts/switch",
+  asyncRoute("accounts.switch", async (req, res, next) => {
     const body = SwitchAccountBody.parse(req.body);
     const account = await getAccountForUser(req.user!.id, body.accountId);
     if (!account) {
@@ -36,15 +37,14 @@ router.post("/accounts/switch", async (req, res, next) => {
       if (err) return next(err);
       res.json(accounts.map((a) => toApiAccount(a, account.id)));
     });
-  } catch (err) {
-    next(err);
-  }
-});
+  }),
+);
 
 // Unlink a connected account. The primary account (the login identity) cannot
 // be removed. If the active account is unlinked, fall back to the primary.
-router.delete("/accounts/:id", async (req, res, next) => {
-  try {
+router.delete(
+  "/accounts/:id",
+  asyncRoute("accounts.unlink", async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) {
       res.status(400).json({ error: "Invalid account id" });
@@ -69,9 +69,7 @@ router.delete("/accounts/:id", async (req, res, next) => {
     const accounts = await listAccountsForUser(req.user!.id);
     const activeId = req.session.activeAccountId ?? accounts.find((a) => a.isPrimary)?.id;
     res.json(accounts.map((a) => toApiAccount(a, activeId)));
-  } catch (err) {
-    next(err);
-  }
-});
+  }),
+);
 
 export default router;

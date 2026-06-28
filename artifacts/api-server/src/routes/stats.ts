@@ -1,10 +1,11 @@
 import { Router, type IRouter } from "express";
 import { clientForAccount } from "../lib/google";
 import { listEmails, listLabels } from "../lib/gmail";
+import { asyncRoute } from "../middlewares/asyncRoute";
 
 const router: IRouter = Router();
 
-router.get("/stats", async (req, res) => {
+router.get("/stats", asyncRoute("stats.get", async (req, res) => {
   const auth = clientForAccount(req.account!);
 
   // Stats describe a recent inbox window; all counts come from the same set
@@ -35,6 +36,6 @@ router.get("/stats", async (req, res) => {
       count: l.emailCount,
     })),
   });
-});
+}));
 
 export default router;

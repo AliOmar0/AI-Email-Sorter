@@ -14,4 +14,6 @@ export interface User {
   picture?: string | null;
   /** Whether background auto-labeling is enabled for this user. */
   autoLabelEnabled?: boolean;
+  /** Whether daily unread label digests are emailed to the user. */
+  dailyDigestEnabled?: boolean;
 }

@@ -88,6 +88,7 @@ export async function ensureUsersTable(): Promise<void> {
       "token_version" integer NOT NULL DEFAULT 0,
       "auto_label_enabled" boolean NOT NULL DEFAULT false,
       "auto_label_cursor" timestamp with time zone,
+      "daily_digest_enabled" boolean NOT NULL DEFAULT false,
       "created_at" timestamp with time zone NOT NULL DEFAULT now(),
       "updated_at" timestamp with time zone NOT NULL DEFAULT now()
     );
@@ -97,6 +98,8 @@ export async function ensureUsersTable(): Promise<void> {
       ADD COLUMN IF NOT EXISTS "auto_label_enabled" boolean NOT NULL DEFAULT false;
     ALTER TABLE "users"
       ADD COLUMN IF NOT EXISTS "auto_label_cursor" timestamp with time zone;
+    ALTER TABLE "users"
+      ADD COLUMN IF NOT EXISTS "daily_digest_enabled" boolean NOT NULL DEFAULT false;
   `);
 }
 
@@ -117,9 +120,12 @@ export async function ensureAccountsTable(): Promise<void> {
       "token_expiry" timestamp with time zone,
       "is_primary" boolean NOT NULL DEFAULT false,
       "auto_label_cursor" timestamp with time zone,
+      "daily_digest_cursor" timestamp with time zone,
       "created_at" timestamp with time zone NOT NULL DEFAULT now(),
       "updated_at" timestamp with time zone NOT NULL DEFAULT now()
     );
+    ALTER TABLE "accounts"
+      ADD COLUMN IF NOT EXISTS "daily_digest_cursor" timestamp with time zone;
     INSERT INTO "accounts"
       ("user_id","google_id","email","name","picture","access_token","refresh_token","token_expiry","is_primary","auto_label_cursor")
     SELECT u."id", u."google_id", u."email", u."name", u."picture",

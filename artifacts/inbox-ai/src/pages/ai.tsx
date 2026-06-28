@@ -14,7 +14,7 @@ import {
   listEmails
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Sparkles, BrainCircuit, Wand2, Layers, CheckCircle2, Loader2, ArrowRight, Clock } from "lucide-react";
+import { Sparkles, BrainCircuit, Wand2, Layers, CheckCircle2, Loader2, ArrowRight, Clock, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -39,6 +39,7 @@ export default function AIStudioPage() {
   const [isAutoLabeling, setIsAutoLabeling] = useState(false);
 
   const autoLabelEnabled = me?.autoLabelEnabled ?? false;
+  const dailyDigestEnabled = me?.dailyDigestEnabled ?? false;
 
   const handleToggleAutoLabel = (next: boolean) => {
     // Optimistic so the switch responds instantly; reconcile on error.
@@ -58,6 +59,30 @@ export default function AIStudioPage() {
         onError: () => {
           queryClient.setQueryData<any>(getGetCurrentUserQueryKey(), (old: any) =>
             old ? { ...old, autoLabelEnabled: !next } : old,
+          );
+          toast({ title: "Couldn't update setting", variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  const handleToggleDailyDigest = (next: boolean) => {
+    queryClient.setQueryData<any>(getGetCurrentUserQueryKey(), (old: any) =>
+      old ? { ...old, dailyDigestEnabled: next } : old,
+    );
+    updateSettings.mutate(
+      { data: { dailyDigestEnabled: next } },
+      {
+        onSuccess: () =>
+          toast({
+            title: next ? "Daily digest on" : "Daily digest off",
+            description: next
+              ? "Unread label summaries will be emailed to you daily."
+              : "Daily digest emails have been disabled.",
+          }),
+        onError: () => {
+          queryClient.setQueryData<any>(getGetCurrentUserQueryKey(), (old: any) =>
+            old ? { ...old, dailyDigestEnabled: !next } : old,
           );
           toast({ title: "Couldn't update setting", variant: "destructive" });
         },
@@ -176,25 +201,48 @@ export default function AIStudioPage() {
         </div>
 
         {activeTab === "overview" && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-border/60 bg-muted/30 p-5 sm:p-6">
-            <div className="flex items-start gap-4 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-foreground/5 border border-border/50 flex items-center justify-center shrink-0">
-                <Clock className="w-5 h-5 text-foreground/70" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-border/60 bg-muted/30 p-5 sm:p-6">
+              <div className="flex items-start gap-4 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-foreground/5 border border-border/50 flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5 text-foreground/70" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-semibold text-foreground">Automatic background labeling</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-xl">
+                    When on, new unlabeled mail is labeled for you on a schedule, no manual run needed.
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h3 className="text-sm sm:text-base font-semibold text-foreground">Automatic background labeling</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-xl">
-                  When on, new unlabeled mail is labeled for you on a schedule — no need to run Magic Auto-Label manually.
-                </p>
-              </div>
+              <Switch
+                checked={autoLabelEnabled}
+                onCheckedChange={handleToggleAutoLabel}
+                disabled={updateSettings.isPending}
+                aria-label="Toggle automatic background labeling"
+                className="shrink-0"
+              />
             </div>
-            <Switch
-              checked={autoLabelEnabled}
-              onCheckedChange={handleToggleAutoLabel}
-              disabled={updateSettings.isPending}
-              aria-label="Toggle automatic background labeling"
-              className="shrink-0"
-            />
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-border/60 bg-muted/30 p-5 sm:p-6">
+              <div className="flex items-start gap-4 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-foreground/5 border border-border/50 flex items-center justify-center shrink-0">
+                  <MailCheck className="w-5 h-5 text-foreground/70" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-semibold text-foreground">Daily label digest</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-xl">
+                    Receive one daily email summarizing unread messages grouped by your labels.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={dailyDigestEnabled}
+                onCheckedChange={handleToggleDailyDigest}
+                disabled={updateSettings.isPending}
+                aria-label="Toggle daily label digest"
+                className="shrink-0"
+              />
+            </div>
           </div>
         )}
 

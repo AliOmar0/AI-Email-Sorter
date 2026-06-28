@@ -25,7 +25,8 @@ export const GetCurrentUserResponse = zod.object({
   "email": zod.string(),
   "name": zod.string(),
   "picture": zod.string().nullish(),
-  "autoLabelEnabled": zod.boolean().optional().describe('Whether background auto-labeling is enabled for this user.')
+  "autoLabelEnabled": zod.boolean().optional().describe('Whether background auto-labeling is enabled for this user.'),
+  "dailyDigestEnabled": zod.boolean().optional().describe('Whether daily unread label digests are emailed to the user.')
 })
 
 
@@ -469,7 +470,8 @@ export const GetStatsResponse = zod.object({
  * @summary Update per-user settings
  */
 export const UpdateSettingsBody = zod.object({
-  "autoLabelEnabled": zod.boolean().optional()
+  "autoLabelEnabled": zod.boolean().optional(),
+  "dailyDigestEnabled": zod.boolean().optional()
 })
 
 export const UpdateSettingsResponse = zod.object({
@@ -477,7 +479,8 @@ export const UpdateSettingsResponse = zod.object({
   "email": zod.string(),
   "name": zod.string(),
   "picture": zod.string().nullish(),
-  "autoLabelEnabled": zod.boolean().optional().describe('Whether background auto-labeling is enabled for this user.')
+  "autoLabelEnabled": zod.boolean().optional().describe('Whether background auto-labeling is enabled for this user.'),
+  "dailyDigestEnabled": zod.boolean().optional().describe('Whether daily unread label digests are emailed to the user.')
 })
 
 

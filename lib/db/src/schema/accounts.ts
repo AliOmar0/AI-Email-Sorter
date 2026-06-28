@@ -27,6 +27,9 @@ export const accountsTable = pgTable("accounts", {
   // Per-mailbox watermark for the background auto-label cron (newest message
   // internalDate already considered for this specific account).
   autoLabelCursor: timestamp("auto_label_cursor", { withTimezone: true }),
+  // Per-mailbox watermark for the daily digest cron. The first run looks back
+  // 24 hours, then each run summarizes mail after this timestamp.
+  dailyDigestCursor: timestamp("daily_digest_cursor", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

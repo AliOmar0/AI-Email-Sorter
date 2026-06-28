@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, type ReactNode } from "react";
+import { Component, Suspense, lazy, type ComponentType, type ReactNode } from "react";
 
 // The `shaders` package (shaders.com) is a WebGPU-based, three.js-backed effects
 // library. It's heavy and only renders on WebGPU-capable browsers, so we:
@@ -14,14 +14,20 @@ import { Component, Suspense, lazy, type ReactNode } from "react";
 // Swap <MeshGradient /> for any effect from "shaders/react" — e.g. Aurora,
 // FlowingGradient, Plasma, StudioBackground — to change the look.
 const LazyShader = lazy(async () => {
-  const { Shader, MeshGradient } = await import("shaders/react");
+  const shaderModule = await import("shaders/react");
+  const { Shader } = shaderModule;
+  const MeshGradient = (
+    shaderModule as typeof shaderModule & {
+      MeshGradient?: ComponentType;
+    }
+  ).MeshGradient;
   return {
     default: () => (
       <Shader
         disableTelemetry
         style={{ width: "100%", height: "100%" }}
       >
-        <MeshGradient />
+        {MeshGradient ? <MeshGradient /> : null}
       </Shader>
     ),
   };

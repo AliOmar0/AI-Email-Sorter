@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useDigestEmails, ListEmailsView } from "@workspace/api-client-react";
 import {
   Dialog,
@@ -8,6 +8,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import { Sparkles, Loader2 } from "lucide-react";
 
 interface DigestDialogProps {
@@ -27,16 +28,17 @@ export function DigestDialog({
 }: DigestDialogProps) {
   const digest = useDigestEmails();
   const { mutate, reset, data, isPending, isError } = digest;
+  const [onlyUnread, setOnlyUnread] = useState(false);
 
   // Generate the digest each time the dialog opens for the current scope.
   useEffect(() => {
     if (open) {
-      mutate({ data: { view, labelId, onlyUnread: false } });
+      mutate({ data: { view, labelId, onlyUnread } });
     } else {
       reset();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, view, labelId]);
+  }, [open, view, labelId, onlyUnread]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -50,6 +52,21 @@ export function DigestDialog({
             An AI summary of your most recent emails in this view.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-border/50 bg-muted/30 px-3 py-2">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">Unread only</p>
+            <p className="text-xs text-muted-foreground truncate">
+              Limit this digest to unread messages.
+            </p>
+          </div>
+          <Switch
+            checked={onlyUnread}
+            onCheckedChange={setOnlyUnread}
+            disabled={isPending}
+            aria-label="Summarize unread emails only"
+          />
+        </div>
 
         {isPending ? (
           <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground text-sm">

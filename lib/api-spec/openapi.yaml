@@ -564,11 +564,16 @@ components:
         autoLabelEnabled:
           type: boolean
           description: Whether background auto-labeling is enabled for this user.
+        dailyDigestEnabled:
+          type: boolean
+          description: Whether daily unread label digests are emailed to the user.
 
     UpdateSettingsInput:
       type: object
       properties:
         autoLabelEnabled:
+          type: boolean
+        dailyDigestEnabled:
           type: boolean
 
     ConnectedAccount:

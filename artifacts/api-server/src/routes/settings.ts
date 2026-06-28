@@ -2,18 +2,27 @@ import { Router, type IRouter } from "express";
 import { UpdateSettingsBody } from "@workspace/api-zod";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { asyncRoute } from "../middlewares/asyncRoute";
 
 const router: IRouter = Router();
 
-// Per-user preferences. Currently just the background auto-labeling opt-in.
-router.patch("/settings", async (req, res, next) => {
-  try {
+// Per-user preferences for scheduled AI features.
+router.patch(
+  "/settings",
+  asyncRoute("settings.update", async (req, res) => {
     const body = UpdateSettingsBody.parse(req.body);
-    const updates: { autoLabelEnabled?: boolean; updatedAt: Date } = {
+    const updates: {
+      autoLabelEnabled?: boolean;
+      dailyDigestEnabled?: boolean;
+      updatedAt: Date;
+    } = {
       updatedAt: new Date(),
     };
     if (body.autoLabelEnabled !== undefined) {
       updates.autoLabelEnabled = body.autoLabelEnabled;
+    }
+    if (body.dailyDigestEnabled !== undefined) {
+      updates.dailyDigestEnabled = body.dailyDigestEnabled;
     }
     const [user] = await db
       .update(usersTable)
@@ -26,10 +35,9 @@ router.patch("/settings", async (req, res, next) => {
       name: user.name,
       picture: user.picture,
       autoLabelEnabled: user.autoLabelEnabled,
+      dailyDigestEnabled: user.dailyDigestEnabled,
     });
-  } catch (err) {
-    next(err);
-  }
-});
+  }),
+);
 
 export default router;

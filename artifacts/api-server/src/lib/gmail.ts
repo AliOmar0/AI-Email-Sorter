@@ -133,7 +133,9 @@ function parseFrom(from: string): { sender: string; senderEmail: string } {
 async function getLabelIndex(
   gmail: gmail_v1.Gmail,
 ): Promise<Map<string, LabelIndexEntry>> {
-  const { data } = await gmail.users.labels.list({ userId: "me" });
+  const { data } = await withGmailRetry(() =>
+    gmail.users.labels.list({ userId: "me" }),
+  );
   const map = new Map<string, LabelIndexEntry>();
   for (const l of data.labels ?? []) {
     if (!l.id) continue;
@@ -306,11 +308,13 @@ export async function getEmail(
 ): Promise<ApiEmail> {
   const gmail = gmailClient(auth);
   const index = await getLabelIndex(gmail);
-  const { data } = await gmail.users.messages.get({
-    userId: "me",
-    id,
-    format: "full",
-  });
+  const { data } = await withGmailRetry(() =>
+    gmail.users.messages.get({
+      userId: "me",
+      id,
+      format: "full",
+    }),
+  );
   return toApiEmail(data, index, extractBody(data.payload));
 }
 
@@ -328,11 +332,13 @@ export async function updateEmailState(
   if (state.isStarred === false) removeLabelIds.push("STARRED");
 
   if (addLabelIds.length || removeLabelIds.length) {
-    await gmail.users.messages.modify({
-      userId: "me",
-      id,
-      requestBody: { addLabelIds, removeLabelIds },
-    });
+    await withGmailRetry(() =>
+      gmail.users.messages.modify({
+        userId: "me",
+        id,
+        requestBody: { addLabelIds, removeLabelIds },
+      }),
+    );
   }
   return getEmail(auth, id);
 }
@@ -345,11 +351,13 @@ export async function setEmailLabels(
   const gmail = gmailClient(auth);
   const index = await getLabelIndex(gmail);
 
-  const { data } = await gmail.users.messages.get({
-    userId: "me",
-    id,
-    format: "minimal",
-  });
+  const { data } = await withGmailRetry(() =>
+    gmail.users.messages.get({
+      userId: "me",
+      id,
+      format: "minimal",
+    }),
+  );
   const current = (data.labelIds ?? []).filter(
     (lid) => index.get(lid)?.isSystem === false,
   );
@@ -360,11 +368,13 @@ export async function setEmailLabels(
   const removeLabelIds = current.filter((x) => !target.includes(x));
 
   if (addLabelIds.length || removeLabelIds.length) {
-    await gmail.users.messages.modify({
-      userId: "me",
-      id,
-      requestBody: { addLabelIds, removeLabelIds },
-    });
+    await withGmailRetry(() =>
+      gmail.users.messages.modify({
+        userId: "me",
+        id,
+        requestBody: { addLabelIds, removeLabelIds },
+      }),
+    );
   }
   return getEmail(auth, id);
 }
@@ -375,11 +385,13 @@ export async function removeEmailLabel(
   labelId: string,
 ): Promise<ApiEmail> {
   const gmail = gmailClient(auth);
-  await gmail.users.messages.modify({
-    userId: "me",
-    id,
-    requestBody: { removeLabelIds: [labelId] },
-  });
+  await withGmailRetry(() =>
+    gmail.users.messages.modify({
+      userId: "me",
+      id,
+      requestBody: { removeLabelIds: [labelId] },
+    }),
+  );
   return getEmail(auth, id);
 }
 
@@ -393,26 +405,28 @@ export async function bulkLabel(
   const ids = [...new Set(emailIds)];
   if (ids.length === 0) return [];
 
-  await gmail.users.messages.batchModify({
-    userId: "me",
-    requestBody: {
-      ids,
-      addLabelIds: action === "add" ? [labelId] : [],
-      removeLabelIds: action === "remove" ? [labelId] : [],
-    },
-  });
+  await withGmailRetry(() =>
+    gmail.users.messages.batchModify({
+      userId: "me",
+      requestBody: {
+        ids,
+        addLabelIds: action === "add" ? [labelId] : [],
+        removeLabelIds: action === "remove" ? [labelId] : [],
+      },
+    }),
+  );
 
   const index = await getLabelIndex(gmail);
   const msgs = await Promise.all(
     ids.map((id) =>
-      gmail.users.messages
-        .get({
+      withGmailRetry(() =>
+        gmail.users.messages.get({
           userId: "me",
           id,
           format: "metadata",
           metadataHeaders: ["From", "Subject", "Date"],
-        })
-        .then((r) => r.data),
+        }),
+      ).then((r) => r.data),
     ),
   );
   return msgs.map((m) => toApiEmail(m, index, EMPTY_BODY));
@@ -650,12 +664,16 @@ export async function sendEmail(
 
 export async function listLabels(auth: OAuth2Client): Promise<ApiLabel[]> {
   const gmail = gmailClient(auth);
-  const { data } = await gmail.users.labels.list({ userId: "me" });
+  const { data } = await withGmailRetry(() =>
+    gmail.users.labels.list({ userId: "me" }),
+  );
   const visible = (data.labels ?? []).filter(isVisibleLabel);
 
   const detailed = await Promise.all(
     visible.map((l) =>
-      gmail.users.labels.get({ userId: "me", id: l.id! }).then((r) => r.data),
+      withGmailRetry(() =>
+        gmail.users.labels.get({ userId: "me", id: l.id! }),
+      ).then((r) => r.data),
     ),
   );
 
@@ -680,18 +698,20 @@ export async function createLabel(
 ): Promise<ApiLabel> {
   const gmail = gmailClient(auth);
   const backgroundColor = nearestGmailColor(input.color);
-  const { data } = await gmail.users.labels.create({
-    userId: "me",
-    requestBody: {
-      name: input.name,
-      labelListVisibility: "labelShow",
-      messageListVisibility: "show",
-      color: {
-        backgroundColor,
-        textColor: contrastTextColor(backgroundColor),
+  const { data } = await withGmailRetry(() =>
+    gmail.users.labels.create({
+      userId: "me",
+      requestBody: {
+        name: input.name,
+        labelListVisibility: "labelShow",
+        messageListVisibility: "show",
+        color: {
+          backgroundColor,
+          textColor: contrastTextColor(backgroundColor),
+        },
       },
-    },
-  });
+    }),
+  );
   return {
     id: data.id ?? "",
     name: prettyLabelName(data.name ?? input.name),
@@ -717,11 +737,13 @@ export async function updateLabel(
       textColor: contrastTextColor(backgroundColor),
     };
   }
-  const { data } = await gmail.users.labels.patch({
-    userId: "me",
-    id,
-    requestBody,
-  });
+  const { data } = await withGmailRetry(() =>
+    gmail.users.labels.patch({
+      userId: "me",
+      id,
+      requestBody,
+    }),
+  );
   return {
     id: data.id ?? id,
     name: prettyLabelName(data.name ?? ""),
@@ -737,7 +759,7 @@ export async function deleteLabel(
   id: string,
 ): Promise<void> {
   const gmail = gmailClient(auth);
-  await gmail.users.labels.delete({ userId: "me", id });
+  await withGmailRetry(() => gmail.users.labels.delete({ userId: "me", id }));
 }
 
 export async function getLabelById(
@@ -746,7 +768,9 @@ export async function getLabelById(
 ): Promise<{ isSystem: boolean } | null> {
   const gmail = gmailClient(auth);
   try {
-    const { data } = await gmail.users.labels.get({ userId: "me", id });
+    const { data } = await withGmailRetry(() =>
+      gmail.users.labels.get({ userId: "me", id }),
+    );
     return { isSystem: data.type !== "user" };
   } catch {
     return null;

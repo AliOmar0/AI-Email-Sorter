@@ -203,13 +203,15 @@ export default function InboxPage() {
   };
 
   const handleToggleStar = (email: Email) => {
-    const next = !email.isStarred;
+    const previous = email.isStarred;
+    const next = !previous;
     patchEmailEverywhere(email.id, { isStarred: next });
     updateEmail.mutate(
       { id: email.id, data: { isStarred: next } },
       {
+        onSuccess: (updated) => patchEmailEverywhere(email.id, updated),
         onError: () => {
-          patchEmailEverywhere(email.id, { isStarred: !next });
+          patchEmailEverywhere(email.id, { isStarred: previous });
           toast({ title: "Couldn't update star", variant: "destructive" });
         },
       },
@@ -217,13 +219,15 @@ export default function InboxPage() {
   };
 
   const handleToggleRead = (email: Email) => {
-    const next = !email.isRead;
+    const previous = email.isRead;
+    const next = !previous;
     patchEmailEverywhere(email.id, { isRead: next });
     updateEmail.mutate(
       { id: email.id, data: { isRead: next } },
       {
+        onSuccess: (updated) => patchEmailEverywhere(email.id, updated),
         onError: () => {
-          patchEmailEverywhere(email.id, { isRead: !next });
+          patchEmailEverywhere(email.id, { isRead: previous });
           toast({ title: "Couldn't update read state", variant: "destructive" });
         },
       },
@@ -440,6 +444,11 @@ export default function InboxPage() {
                 onClick={() => applyMailAction([...selectedEmailIds], "markRead")}
                 className="h-9 w-9 sm:h-8 sm:w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full">
                 <MailOpen className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" title="Mark as unread" aria-label="Mark selected as unread"
+                onClick={() => applyMailAction([...selectedEmailIds], "markUnread")}
+                className="h-9 w-9 sm:h-8 sm:w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full">
+                <Mail className="w-4 h-4" />
               </Button>
               <LabelPicker
                 align="end"
@@ -720,7 +729,17 @@ function EmailDetail({
       );
       updateEmail.mutate(
         { id: email.id, data: { isRead: true } },
-        { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() }) },
+        {
+          onSuccess: (updated) => {
+            queryClient.setQueryData<Email>(getGetEmailQueryKey(email.id), updated);
+            queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() });
+          },
+          onError: () => {
+            queryClient.setQueryData<Email>(getGetEmailQueryKey(email.id), (old) =>
+              old ? { ...old, isRead: false } : old,
+            );
+          },
+        },
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -750,22 +769,44 @@ function EmailDetail({
   }
 
   const setReadOptimistic = (next: boolean) => {
+    const previous = email.isRead;
     queryClient.setQueryData<Email>(getGetEmailQueryKey(email.id), (old) =>
       old ? { ...old, isRead: next } : old,
     );
     updateEmail.mutate(
       { id: email.id, data: { isRead: next } },
-      { onSettled: () => queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() }) },
+      {
+        onSuccess: (updated) =>
+          queryClient.setQueryData<Email>(getGetEmailQueryKey(email.id), updated),
+        onError: () => {
+          queryClient.setQueryData<Email>(getGetEmailQueryKey(email.id), (old) =>
+            old ? { ...old, isRead: previous } : old,
+          );
+          toast({ title: "Couldn't update read state", variant: "destructive" });
+        },
+        onSettled: () => queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() }),
+      },
     );
   };
 
   const setStarOptimistic = (next: boolean) => {
+    const previous = email.isStarred;
     queryClient.setQueryData<Email>(getGetEmailQueryKey(email.id), (old) =>
       old ? { ...old, isStarred: next } : old,
     );
     updateEmail.mutate(
       { id: email.id, data: { isStarred: next } },
-      { onSettled: () => queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() }) },
+      {
+        onSuccess: (updated) =>
+          queryClient.setQueryData<Email>(getGetEmailQueryKey(email.id), updated),
+        onError: () => {
+          queryClient.setQueryData<Email>(getGetEmailQueryKey(email.id), (old) =>
+            old ? { ...old, isStarred: previous } : old,
+          );
+          toast({ title: "Couldn't update star", variant: "destructive" });
+        },
+        onSettled: () => queryClient.invalidateQueries({ queryKey: getListEmailsQueryKey() }),
+      },
     );
   };
 

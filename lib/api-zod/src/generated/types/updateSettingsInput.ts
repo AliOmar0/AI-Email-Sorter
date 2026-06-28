@@ -8,4 +8,5 @@
 
 export interface UpdateSettingsInput {
   autoLabelEnabled?: boolean;
+  dailyDigestEnabled?: boolean;
 }
